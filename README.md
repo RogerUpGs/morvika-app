@@ -2,6 +2,7 @@
 
 Web-app (PWA) for kommunikasjon mellom grunneier, Mørvika Vel, Mørvikveien Veilag og hytteeierne i Mørvika og Torpum. Én app for PC, nettbrett og telefon.
 
+- **App:** https://app.morvika.no
 - **Prototype:** https://claude.ai/artifact/8TNfg7E5mpENvt7xEm34RR
 - **Oppsett av Supabase og Cloudflare:** [docs/oppsett.md](docs/oppsett.md)
 

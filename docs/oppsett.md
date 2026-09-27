@@ -17,7 +17,11 @@ Bare inviterte skal kunne logge inn.
 2. Slå **av** «Allow new users to sign up». Sjekk at **Email** fortsatt er slått på.
 3. Trykk **Save**.
 
-## 3. E-posten med innloggingskoden (venter)
+## 3. E-posten med innloggingskoden (satt opp 27. sep 2026)
+
+E-post sendes via **Resend** fra `noreply@morvika.no` (domenet godkjent med DKIM `resend._domainkey` og CNAME `send`/`rsend` i Cloudflare, «DNS only»). Supabase: Authentication → Emails → SMTP Settings: `smtp.resend.com`, port 465, brukernavn `resend`, passord = API-nøkkel fra Resend. Malene «Magic link» og «Confirm signup» viser koden (`{{ .Token }}`) i emnet og i teksten.
+
+### Opprinnelig notat
 
 Supabase lar oss ikke endre e-postmalene før prosjektet har en egen e-posttjeneste (SMTP). Inntil da sender Supabase en e-post med lenken «Sign in», som logger deg rett inn. Det holder for testing.
 
