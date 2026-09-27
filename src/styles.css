@@ -456,3 +456,5 @@ td .pill[class*="st-"]{white-space:nowrap}
 td.num{white-space:nowrap}
 
 .field .hint { display: block; font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 4px; line-height: 1.35; }
+.seg.small{margin-top:6px;display:grid;max-width:360px}
+.seg.small button{text-align:center;padding:8px 12px}

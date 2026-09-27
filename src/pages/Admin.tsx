@@ -10,8 +10,10 @@ import { Icon } from '../components/Icon';
 interface AdminCabin {
   id: string; area: Area; number: number; label: string; address: string | null;
   gnr: number | null; bnr: number | null; fnr: number | null;
-  vel_member: boolean; vei_member: boolean; access: 'full' | 'veilag';
+  vel_member: boolean; vei_member: boolean; access: 'full' | 'veilag'; tomt: Tomt | null;
 }
+type Tomt = 'feste' | 'selveier';
+const TOMT_LABEL: Record<Tomt, string> = { feste: 'Festetomt', selveier: 'Selveiertomt' };
 type PersonStatus = 'aktiv' | 'venter' | 'mangler_epost';
 interface Person {
   id: string; status: PersonStatus; full_name: string; email: string | null; phone: string | null;
@@ -41,7 +43,7 @@ export function AdminPage() {
 
   const load = useCallback(async () => {
     const [c, p, n] = await Promise.all([
-      supabase.from('cabins').select('id,area,number,label,address,gnr,bnr,fnr,vel_member,vei_member,access').order('area').order('number'),
+      supabase.from('cabins').select('id,area,number,label,address,gnr,bnr,fnr,vel_member,vei_member,access,tomt').order('area').order('number'),
       supabase.rpc('admin_people'),
       supabase.from('cabin_notes').select('cabin_id,note'),
     ]);
@@ -71,6 +73,7 @@ export function AdminPage() {
 function CabinsTab({ cabins, people, notes, reload }: { cabins: AdminCabin[]; people: Person[]; notes: Record<string, string>; reload: () => Promise<void> }) {
   const [q, setQ] = useState('');
   const [area, setArea] = useState<Area | 'alle'>('alle');
+  const [tomt, setTomt] = useState<Tomt | 'alle'>('alle');
   const [editing, setEditing] = useState<AdminCabin | null>(null);
   const [showQuick, setShowQuick] = useState(true);
   const formRef = useRef<HTMLDivElement>(null);
@@ -78,10 +81,10 @@ function CabinsTab({ cabins, people, notes, reload }: { cabins: AdminCabin[]; pe
   const ownersOf = useCallback((cabinId: string) => people.filter((p) => p.cabin_ids.includes(cabinId)), [people]);
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return cabins.filter((c) => (area === 'alle' || c.area === area) && (!s
+    return cabins.filter((c) => (area === 'alle' || c.area === area) && (tomt === 'alle' || c.tomt === tomt) && (!s
       || c.label.toLowerCase().includes(s) || String(c.number) === s || (c.address ?? '').toLowerCase().includes(s)
       || ownersOf(c.id).some((o) => o.full_name.toLowerCase().includes(s) || (o.email ?? '').includes(s))));
-  }, [cabins, area, q, ownersOf]);
+  }, [cabins, area, tomt, q, ownersOf]);
 
   const owners = people.filter((p) => p.cabin_ids.length > 0);
   const stats = [
@@ -126,6 +129,11 @@ function CabinsTab({ cabins, people, notes, reload }: { cabins: AdminCabin[]; pe
             <button key={a} className={`chip ${area === a ? 'on' : ''}`} onClick={() => setArea(a)}>{a === 'alle' ? 'Alle' : AREA_LABEL[a]}</button>
           ))}
         </div>
+        <div className="chips" style={{ margin: 0 }}>
+          {(['alle', 'feste', 'selveier'] as const).map((t) => (
+            <button key={t} className={`chip ${tomt === t ? 'on' : ''}`} onClick={() => setTomt(t)}>{t === 'alle' ? 'Alle tomter' : TOMT_LABEL[t]}</button>
+          ))}
+        </div>
       </div>
       {cabins.length === 0 ? (
         <div className="empty">Ingen hytter registrert ennå. Bruk hurtigregistreringen over.</div>
@@ -133,13 +141,14 @@ function CabinsTab({ cabins, people, notes, reload }: { cabins: AdminCabin[]; pe
         <div className="card" style={{ padding: '6px 8px' }}>
           <div className="tbl-wrap">
             <table>
-              <thead><tr><th>Hytte</th><th>Eiendom</th><th>Hytteadresse</th><th>Gnr/Bnr/Fnr</th><th>Eiere</th><th>Vel</th><th>Veilag</th><th /></tr></thead>
+              <thead><tr><th>Hytte</th><th>Eiendom</th><th>Hytteadresse</th><th>Tomt</th><th>Gnr/Bnr/Fnr</th><th>Eiere</th><th>Vel</th><th /></tr></thead>
               <tbody>
                 {shown.map((c) => (
                   <tr key={c.id}>
                     <td><b>{c.label}</b>{notes[c.id] && <div className="muted" style={{ fontSize: 12 }} title={notes[c.id]}>Merknad</div>}</td>
                     <td>{AREA_LABEL[c.area]}{c.access === 'veilag' && <div className="muted" style={{ fontSize: 12 }}>Bare Veilaget</div>}</td>
                     <td>{c.address || <span className="muted">–</span>}</td>
+                    <td>{c.tomt ? TOMT_LABEL[c.tomt] : <span className="muted">–</span>}</td>
                     <td className="num">{[c.gnr, c.bnr, c.fnr].map((x) => x ?? '–').join(' / ')}</td>
                     <td>
                       {ownersOf(c.id).length === 0 ? <span className="muted">Ingen eier</span> : (
@@ -149,7 +158,6 @@ function CabinsTab({ cabins, people, notes, reload }: { cabins: AdminCabin[]; pe
                       )}
                     </td>
                     <td>{c.vel_member ? 'Ja' : '–'}</td>
-                    <td>{c.vei_member ? 'Ja' : '–'}</td>
                     <td><button className="btn small" onClick={() => edit(c)}>Rediger</button></td>
                   </tr>
                 ))}
@@ -177,6 +185,7 @@ function streetOf(address: string): string {
 }
 const defaultGnr = (a: Area) => memo.get(`admin-gnr-${a}`) || (a === 'morvika' ? '23' : '');
 const defaultStreet = (a: Area) => memo.get(`admin-street-${a}`);
+const defaultTomt = (a: Area): Tomt | null => (a === 'torpum' ? null : (memo.get('admin-tomt') as Tomt) || 'feste');
 
 function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClose }: {
   cabins: AdminCabin[]; editing: AdminCabin | null; owners: Person[]; note: string;
@@ -200,6 +209,7 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
   const [bnr, setBnr] = useState(editing?.bnr != null ? String(editing.bnr) : '');
   const [fnr, setFnr] = useState(editing?.fnr != null ? String(editing.fnr) : '');
   const [vel, setVel] = useState(editing ? editing.vel_member : startArea === 'morvika');
+  const [tomt, setTomt] = useState<Tomt | null>(editing ? editing.tomt : defaultTomt(startArea));
   const [note, setNote] = useState(initialNote);
   const [ownerRows, setOwnerRows] = useState<OwnerDraft[]>(() => editing && owners.length
     ? owners.map((o) => ({ key: o.id, id: o.id, name: o.full_name, email: o.email ?? '', phone: o.phone ?? '', status: o.status }))
@@ -218,7 +228,7 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
     if (!editing) {
       setNumber(String(nextNumber(a)));
       setVel(a === 'morvika');
-      setAddress(defaultStreet(a)); setGnr(defaultGnr(a));
+      setAddress(defaultStreet(a)); setGnr(defaultGnr(a)); setTomt(defaultTomt(a));
     }
   }
   const setOwner = (k: string, patch: Partial<OwnerDraft>) => setOwnerRows((rows) => rows.map((r) => (r.key === k ? { ...r, ...patch } : r)));
@@ -241,7 +251,8 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
     setBusy(true);
     const row = {
       area, number: n, label: shownLabel.trim() || labelFor(area, n), address: address.trim() || null,
-      gnr: toInt(gnr), bnr: toInt(bnr), fnr: toInt(fnr),
+      gnr: toInt(gnr), bnr: toInt(bnr), fnr: tomt === 'selveier' ? null : toInt(fnr),
+      tomt: area === 'torpum' ? null : tomt,
       vel_member: area === 'torpum' ? false : vel, vei_member: true,
       access: area === 'torpum' ? 'veilag' : 'full',
     };
@@ -282,6 +293,7 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
       const street = streetOf(address);
       if (street) memo.set(`admin-street-${area}`, street);
       if (gnr.trim()) memo.set(`admin-gnr-${area}`, gnr.trim());
+      if (area === 'morvika' && tomt) memo.set('admin-tomt', tomt);
     }
     await onSaved();
 
@@ -327,7 +339,17 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
         </label>
         <label className="field" htmlFor="q-gnr">Gnr<input id="q-gnr" type="number" min={1} inputMode="numeric" value={gnr} onChange={(e) => setGnr(e.target.value)} /></label>
         <label className="field" htmlFor="q-bnr">Bnr<input id="q-bnr" type="number" min={1} inputMode="numeric" value={bnr} onChange={(e) => setBnr(e.target.value)} /></label>
-        <label className="field" htmlFor="q-fnr">Fnr<input id="q-fnr" type="number" min={1} inputMode="numeric" value={fnr} onChange={(e) => setFnr(e.target.value)} /></label>
+        <label className="field" htmlFor="q-fnr">Fnr<input id="q-fnr" type="number" min={1} inputMode="numeric" disabled={tomt === 'selveier'}
+          value={tomt === 'selveier' ? '' : fnr} onChange={(e) => setFnr(e.target.value)} placeholder={tomt === 'selveier' ? 'Ikke festet' : ''} /></label>
+        {area === 'morvika' && (
+          <div className="field span2">Tomt
+            <div className="seg small" role="radiogroup" aria-label="Tomt">
+              {(['feste', 'selveier'] as Tomt[]).map((t) => (
+                <button type="button" key={t} role="radio" aria-checked={tomt === t} className={tomt === t ? 'on' : ''} onClick={() => setTomt(t)}>{TOMT_LABEL[t]}</button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="field">Medlemskap
           <div className="checks">
             <label className="check"><input type="checkbox" checked={area === 'torpum' ? false : vel} disabled={area === 'torpum'} onChange={(e) => setVel(e.target.checked)} /> Mørvika Vel</label>
