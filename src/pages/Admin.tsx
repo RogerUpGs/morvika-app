@@ -164,6 +164,20 @@ function CabinsTab({ cabins, people, notes, reload }: { cabins: AdminCabin[]; pe
 }
 
 /* ---------- Skjema for ny hytte og redigering ---------- */
+// Husker veinavn og gnr per eiendom, så neste hytte bare trenger husnummer og bnr
+const memo = {
+  get(key: string): string { try { return localStorage.getItem(key) ?? ''; } catch { return ''; } },
+  set(key: string, v: string) { try { localStorage.setItem(key, v); } catch { /* privat modus */ } },
+};
+/** «Mørvikveien 209 B» → «Mørvikveien » (veinavnet med mellomrom, klar for nytt nummer) */
+function streetOf(address: string): string {
+  const m = address.trim().match(/^(.*?\D)\s*\d+\s*[A-Za-zÆØÅæøå]?$/);
+  const street = (m ? m[1] : address).trim();
+  return street ? `${street} ` : '';
+}
+const defaultGnr = (a: Area) => memo.get(`admin-gnr-${a}`) || (a === 'morvika' ? '23' : '');
+const defaultStreet = (a: Area) => memo.get(`admin-street-${a}`);
+
 function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClose }: {
   cabins: AdminCabin[]; editing: AdminCabin | null; owners: Person[]; note: string;
   onSaved: () => Promise<void>; onClose: () => void;
@@ -181,12 +195,11 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
   const [number, setNumber] = useState<string>(editing ? String(editing.number) : String(nextNumber(startArea)));
   const [label, setLabel] = useState(editing?.label ?? '');
   const [labelTouched, setLabelTouched] = useState(Boolean(editing));
-  const [address, setAddress] = useState(editing?.address ?? '');
-  const [gnr, setGnr] = useState(editing?.gnr != null ? String(editing.gnr) : '');
+  const [address, setAddress] = useState(editing ? (editing.address ?? '') : defaultStreet(startArea));
+  const [gnr, setGnr] = useState(editing ? (editing.gnr != null ? String(editing.gnr) : '') : defaultGnr(startArea));
   const [bnr, setBnr] = useState(editing?.bnr != null ? String(editing.bnr) : '');
   const [fnr, setFnr] = useState(editing?.fnr != null ? String(editing.fnr) : '');
   const [vel, setVel] = useState(editing ? editing.vel_member : startArea === 'morvika');
-  const [vei, setVei] = useState(editing ? editing.vei_member : true);
   const [note, setNote] = useState(initialNote);
   const [ownerRows, setOwnerRows] = useState<OwnerDraft[]>(() => editing && owners.length
     ? owners.map((o) => ({ key: o.id, id: o.id, name: o.full_name, email: o.email ?? '', phone: o.phone ?? '', status: o.status }))
@@ -204,7 +217,8 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
     try { localStorage.setItem('admin-area', a); } catch { /* privat modus */ }
     if (!editing) {
       setNumber(String(nextNumber(a)));
-      setVel(a === 'morvika'); setVei(true);
+      setVel(a === 'morvika');
+      setAddress(defaultStreet(a)); setGnr(defaultGnr(a));
     }
   }
   const setOwner = (k: string, patch: Partial<OwnerDraft>) => setOwnerRows((rows) => rows.map((r) => (r.key === k ? { ...r, ...patch } : r)));
@@ -228,7 +242,7 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
     const row = {
       area, number: n, label: shownLabel.trim() || labelFor(area, n), address: address.trim() || null,
       gnr: toInt(gnr), bnr: toInt(bnr), fnr: toInt(fnr),
-      vel_member: area === 'torpum' ? false : vel, vei_member: vei,
+      vel_member: area === 'torpum' ? false : vel, vei_member: true,
       access: area === 'torpum' ? 'veilag' : 'full',
     };
     let cabinId = editing?.id;
@@ -264,6 +278,11 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
       }
     }
     setBusy(false);
+    if (!editing) {
+      const street = streetOf(address);
+      if (street) memo.set(`admin-street-${area}`, street);
+      if (gnr.trim()) memo.set(`admin-gnr-${area}`, gnr.trim());
+    }
     await onSaved();
 
     if (problems.length) toast(`${row.label} er lagret, men dette gikk ikke: ${problems.join(', ')}.`);
@@ -272,7 +291,7 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
     if (editing) { onClose(); return; }
     if (andNext) {
       setNumber(String(nextNumber(area, n + 1)));
-      setLabel(''); setLabelTouched(false); setAddress(''); setBnr(''); setFnr(''); setNote('');
+      setLabel(''); setLabelTouched(false); setAddress(streetOf(address)); setBnr(''); setFnr(''); setNote('');
       setOwnerRows([{ key: newKey(), name: '', email: '', phone: '' }]); setRemoved([]);
       numberRef.current?.focus();
     } else onClose();
@@ -302,7 +321,9 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
           <input id="q-label" type="text" value={shownLabel} onChange={(e) => { setLabel(e.target.value); setLabelTouched(true); }} />
         </label>
         <label className="field span2" htmlFor="q-address">Hytteadresse
-          <input id="q-address" type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="F.eks. Mørvikveien 209" />
+          <input id="q-address" type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="F.eks. Mørvikveien 209"
+            onFocus={(e) => { const el = e.currentTarget; const end = el.value.length; requestAnimationFrame(() => el.setSelectionRange(end, end)); }} />
+          <small className="hint">Veinavnet blir stående til neste hytte. Skriv bare nummeret, eller bytt veinavn når du kommer til en ny vei.</small>
         </label>
         <label className="field" htmlFor="q-gnr">Gnr<input id="q-gnr" type="number" min={1} inputMode="numeric" value={gnr} onChange={(e) => setGnr(e.target.value)} /></label>
         <label className="field" htmlFor="q-bnr">Bnr<input id="q-bnr" type="number" min={1} inputMode="numeric" value={bnr} onChange={(e) => setBnr(e.target.value)} /></label>
@@ -310,7 +331,7 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
         <div className="field">Medlemskap
           <div className="checks">
             <label className="check"><input type="checkbox" checked={area === 'torpum' ? false : vel} disabled={area === 'torpum'} onChange={(e) => setVel(e.target.checked)} /> Mørvika Vel</label>
-            <label className="check"><input type="checkbox" checked={vei} onChange={(e) => setVei(e.target.checked)} /> Mørvikveien Veilag</label>
+            <label className="check"><input type="checkbox" checked disabled /> Veilaget (obligatorisk)</label>
           </div>
         </div>
       </fieldset>
