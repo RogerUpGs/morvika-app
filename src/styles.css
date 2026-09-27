@@ -426,3 +426,31 @@ tbody tr:hover td{background:var(--hover)}
 .confirm{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
 .tile2{min-width:0}
 .tile2 b{font-size:clamp(15px,4.2vw,20px);overflow-wrap:break-word}
+
+/* ---------- Administrasjon ---------- */
+.quick{display:flex;flex-direction:column;gap:18px;margin-bottom:28px;border-color:color-mix(in srgb,var(--primary) 45%,var(--line))}
+.quick-h{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.quick-h h2{margin:0;font-size:22px}
+.quick fieldset{border:0;padding:0;margin:0;min-width:0}
+.quick legend{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--primary);margin-bottom:10px;padding:0}
+.qgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.qgrid .span2{grid-column:span 2}
+.checks{display:flex;flex-wrap:wrap;gap:6px 16px;padding-top:6px}
+.seg{display:inline-grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:12px;background:var(--inset);border:1px solid var(--line);max-width:420px}
+.seg button{border:0;border-radius:9px;background:none;color:var(--muted);font:inherit;font-weight:600;padding:9px 14px;cursor:pointer;text-align:left}
+.seg button small{display:block;font-weight:400;font-size:12px}
+.seg button.on{background:var(--primary);color:var(--primary-ink)}
+.owners{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.ownerrow{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1.4fr) minmax(0,1fr) auto;gap:12px;align-items:end;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+.ownerrow-end{display:flex;align-items:center;gap:8px;min-height:42px}
+.ownerlist{display:flex;flex-direction:column;gap:3px}
+.pill.st-aktiv{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,transparent)}
+.pill.st-venter{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.pill.st-mangler_epost{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,transparent)}
+.rolebtn{border:1px solid var(--line-2);background:none;color:var(--muted);border-radius:999px;padding:2px 9px;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
+.rolebtn.on{background:var(--primary-soft);border-color:var(--primary);color:var(--ink)}
+.rolebtn:hover{border-color:var(--control)}
+input[aria-invalid="true"]{border-color:var(--danger)}
+@media (max-width:900px){.qgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.ownerrow{grid-template-columns:1fr}.seg{display:grid;max-width:none}}
+td .pill[class*="st-"]{white-space:nowrap}
+td.num{white-space:nowrap}

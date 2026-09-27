@@ -2,6 +2,7 @@
 -- Brukes bare av supabase/tests/run.sh, aldri i Supabase.
 do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;
 do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
+do $$ begin create role supabase_auth_admin nologin; exception when duplicate_object then null; end $$;
 create schema auth;
 create table auth.users (id uuid primary key, email text, phone text, raw_user_meta_data jsonb not null default '{}');
 create function auth.uid() returns uuid language sql stable as

@@ -70,3 +70,16 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260927143000_torpum_veilag.sql` | Torpum og tilgangsnivået «Bare Veilaget» | 27. sep 2026 |
 | `20260927153000_grunneier_vel_veilag.sql` | Grunneier har full tilgang til Vel og Veilag | 27. sep 2026 |
 | `20260927160000_eierskifte.sql` | Eierperioder, eierskifte og hyttearkiv | 27. sep 2026 |
+| `20260927170000_registrering.sql` | Hurtigregistrering, ventende personer og aktivering ved første innlogging | |
+
+## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
+
+Hytteeierne får konto automatisk første gang de logger inn, men bare hvis e-postadressen er registrert i Administrasjon. Det styres av en «hook» i Supabase:
+
+1. Gå til **Authentication → Hooks** (under «Configuration»).
+2. Trykk **Add hook** og velg **Before User Created**.
+3. **Hook type:** Postgres. **Schema:** public. **Function:** `hook_before_user_created`.
+4. Trykk **Create hook**.
+5. Gå til **Authentication → Sign In / Providers** og slå **på** «Allow new users to sign up». Trykk **Save changes**.
+
+Rekkefølgen er viktig: hooken først, deretter påmelding. Uten hooken kunne hvem som helst laget en konto, men de ville ikke sett noe innhold.

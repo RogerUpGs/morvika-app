@@ -9,7 +9,6 @@ const INFO: Record<string, { phase: string; title: string; points: string[] }> =
   meldinger: { phase: 'Fase 3', title: 'Meldinger', points: ['Private samtaler med grunneier eller styrene', 'Bilder fra telefonen i samtalen', 'Meldinger til styrene leses også av grunneier, så ingen henvendelse blir liggende'] },
   arr: { phase: 'Fase 3', title: 'Arrangementer og dugnad', points: ['Kalender med påmelding', 'Arrangøren ser hvor mange som kommer'] },
   info: { phase: 'Fase 3', title: 'Info og dokumenter', points: ['Vedtekter, brøyteplan og kart', 'Kontakter til styrene og grunneier'] },
-  admin: { phase: 'Fase 2', title: 'Administrasjon', points: ['Hytter, eiere og medlemskap i Vel og Veilag', 'Brukerregister med knapp for ny QR-kode', 'Siste innlogging, innloggede enheter og utlogging fra alle enheter'] },
 };
 
 /** Det Torpum-brukere får se, som bare har tilgang til Veilaget. */

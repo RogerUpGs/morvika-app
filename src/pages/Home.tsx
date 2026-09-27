@@ -35,7 +35,7 @@ export function Home({ go }: { go: (r: string) => void }) {
     meldinger: me.veilagOnly ? 'Til Veilagets styre' : 'Til grunneier og styret',
     arr: 'Dugnad og treff',
     info: 'Dokumenter og kontakter',
-    admin: 'Brukere og roller',
+    admin: 'Hytter og eiere',
   };
   const order = ['chat', 'nyheter', 'varsler', 'meldinger', 'minhytte', 'arr', 'info', 'admin'];
   const tiles = order.map((k) => items.find((i) => i.key === k)).filter((x): x is NonNullable<typeof x> => Boolean(x));

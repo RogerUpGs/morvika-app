@@ -8,6 +8,7 @@ import { Home } from '../pages/Home';
 import { NewsPage } from '../pages/News';
 import { ComingSoon } from '../pages/ComingSoon';
 import { ProfilePage } from '../pages/Profile';
+import { AdminPage } from '../pages/Admin';
 
 const TITLES: Record<string, string> = {
   hjem: 'Hjem', minhytte: 'Min hytte', chat: 'Hyttepraten', nyheter: 'Nyheter', varsler: 'Varsler',
@@ -35,6 +36,7 @@ export function Shell() {
     case 'hjem': page = <Home go={go} />; break;
     case 'nyheter': page = <NewsPage />; break;
     case 'profil': page = <ProfilePage />; break;
+    case 'admin': page = <AdminPage />; break;
     default: page = <ComingSoon view={view} />;
   }
 

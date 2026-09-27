@@ -8,6 +8,11 @@ begin
   execute stmt;
   raise notice 'FEIL %', label;
 exception when insufficient_privilege then raise notice 'OK   %', label; end $$;
+create or replace function pg_temp.fails(label text, stmt text) returns void language plpgsql as $$
+begin
+  execute stmt;
+  raise notice 'FEIL %', label;
+exception when others then raise notice 'OK   %', label; end $$;
 
 -- ---------------------------------------------------------------------
 -- Brukere (som superbruker). Roger opprettes først og blir admin + grunneier.
@@ -257,6 +262,63 @@ select pg_temp.check('Trond beholder rollen i Velet', public.is_resident());
 
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000103';
 select pg_temp.check('Jonas har fått hele Min hytte', (select count(*) from public.cabin_ledger) = 1 and (select count(*) from public.cabin_albums) = 1);
+
+-- ---------------------------------------------------------------------
+-- Hurtigregistrering og aktivering ved første innlogging
+-- ---------------------------------------------------------------------
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+insert into public.cabins (id, area, number, label, address, gnr, bnr, fnr, vel_member, vei_member)
+  values ('10000000-0000-0000-0000-000000000101', 'morvika', 101, 'Hytte 101', 'Mørvikveien 301', 12, 4, 101, true, true);
+insert into public.cabin_notes (cabin_id, note) values ('10000000-0000-0000-0000-000000000101', 'Faktura går til Oslo-adresse');
+select pg_temp.check('ny eier uten konto blir ventende',
+  public.admin_add_owner('10000000-0000-0000-0000-000000000101', 'Anne Hansen', ' Anne@Example.no ', '900 11 222') = 'venter');
+select pg_temp.check('eier med konto kobles direkte',
+  public.admin_add_owner('10000000-0000-0000-0000-000000000101', 'Ola Kjøper', 'ola@example.no') = 'koblet');
+select pg_temp.check('eier uten e-post registreres, men venter',
+  public.admin_add_owner('10000000-0000-0000-0000-000000000101', 'Uten Epost', '') = 'venter');
+select pg_temp.check('personlisten viser aktive og ventende',
+  (select count(*) from public.admin_people() where status = 'venter') = 1
+  and (select count(*) from public.admin_people() where status = 'mangler_epost') = 1
+  and (select count(*) from public.admin_people() where status = 'aktiv') >= 9);
+select public.admin_set_roles((select id from public.pending_people where email = 'anne@example.no'), array['styre_vei']::public.app_role[]);
+select pg_temp.fails('administrator kan ikke fjerne sin egen administratorrolle',
+  $$select public.admin_set_roles('00000000-0000-0000-0000-000000000001', array['grunneier']::public.app_role[])$$);
+select public.admin_add_person('Styre Medlem', 'styre@example.no', null, array['styre_vel']::public.app_role[]) as styre \gset
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000047';
+select pg_temp.denied('vanlig bruker kan ikke registrere eiere',
+  $$select public.admin_add_owner('10000000-0000-0000-0000-000000000101', 'X', 'x@example.no')$$);
+select pg_temp.denied('vanlig bruker får ikke personlisten', $$select * from public.admin_people()$$);
+select pg_temp.check('vanlig bruker ser ikke interne merknader', (select count(*) from public.cabin_notes) = 0);
+select pg_temp.check('vanlig bruker ser ikke ventende personer', (select count(*) from public.pending_people) = 0);
+
+reset role;
+select pg_temp.check('registrert e-post slipper inn (uavhengig av store bokstaver)',
+  public.hook_before_user_created('{"user":{"email":"ANNE@example.no"}}') = '{}'::jsonb);
+select pg_temp.check('ukjent e-post stoppes',
+  public.hook_before_user_created('{"user":{"email":"fremmed@example.no"}}') ? 'error');
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-000000000201', 'anne@example.no');
+select pg_temp.check('Anne fikk navn og mobil fra registreringen',
+  (select full_name || '|' || phone from public.profiles where id = '00000000-0000-0000-0000-000000000201') = 'Anne Hansen|900 11 222');
+select pg_temp.check('Anne ble koblet til hytta og fikk rollen', exists (
+  select 1 from public.cabin_owners where user_id = '00000000-0000-0000-0000-000000000201' and cabin_id = '10000000-0000-0000-0000-000000000101')
+  and exists (select 1 from public.user_roles where user_id = '00000000-0000-0000-0000-000000000201' and role = 'styre_vei'));
+select pg_temp.check('Anne er ikke lenger ventende', not exists (select 1 from public.pending_people where email = 'anne@example.no'));
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-000000000202', 'styre@example.no');
+select pg_temp.check('styremedlem uten hytte fikk rollen ved innlogging',
+  exists (select 1 from public.user_roles where user_id = '00000000-0000-0000-0000-000000000202' and role = 'styre_vel'));
+set role authenticated;
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000201';
+select pg_temp.check('Anne er beboer og ser hytta si', public.is_resident()
+  and exists (select 1 from public.cabins where id = '10000000-0000-0000-0000-000000000101'));
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.admin_remove_owner('10000000-0000-0000-0000-000000000101', (select id from public.pending_people where full_name = 'Uten Epost'));
+select pg_temp.check('ventende uten hytte og rolle fjernes helt', not exists (select 1 from public.pending_people where full_name = 'Uten Epost'));
+select public.admin_update_person('00000000-0000-0000-0000-000000000201', 'Anne M. Hansen', 'ignoreres@example.no', '900 11 333');
+select pg_temp.check('administrator kan endre navn og mobil',
+  (select full_name || '|' || phone from public.admin_people() where id = '00000000-0000-0000-0000-000000000201') = 'Anne M. Hansen|900 11 333');
 
 -- ---------------------------------------------------------------------
 -- Uinvitert og anonym

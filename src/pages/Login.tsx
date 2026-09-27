@@ -4,7 +4,7 @@ import { Icon, Logo } from '../components/Icon';
 
 function explain(message: string): string {
   const m = message.toLowerCase();
-  if (m.includes('signups not allowed') || m.includes('user not found'))
+  if (m.includes('signups not allowed') || m.includes('user not found') || m.includes('ikke invitert'))
     return 'Denne e-postadressen er ikke invitert. Kontakt styret eller grunneier for å få en invitasjon.';
   if (m.includes('rate limit') || m.includes('security purposes'))
     return 'Det er sendt for mange koder på kort tid. Vent litt og prøv igjen.';
@@ -25,7 +25,9 @@ export function Login() {
     setBusy(true); setErr(null);
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      options: { shouldCreateUser: false, emailRedirectTo: window.location.origin },
+      // Kontoen lages ved første innlogging, men bare for e-poster administrator har registrert
+      // (sjekkes av hook_before_user_created i databasen).
+      options: { shouldCreateUser: true, emailRedirectTo: window.location.origin },
     });
     setBusy(false);
     if (error) setErr(explain(error.message));

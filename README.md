@@ -10,7 +10,7 @@ Web-app (PWA) for kommunikasjon mellom grunneier, Mørvika Vel, Mørvikveien Vei
 | Fase | Innhold | Status |
 | --- | --- | --- |
 | 1 · Grunnmur | Database, tilgangsregler, innlogging med kode på e-post, appskall, Nyheter | Ferdig, klar for oppsett |
-| 2 · Administrasjon | Hytter, eiere, roller, invitasjoner med QR-kode | Neste |
+| 2 · Administrasjon | Hurtigregistrering, hytteregister, personer og roller | Del 1 ferdig. Gjenstår: eierskifte, hyttearkiv, QR-invitasjoner |
 | 3 · Fellesskap og varsler | Hyttepraten, Varsler med push, Meldinger, Arrangementer, Info | |
 | 4 · Min hytte | Dokumentregister, fotoalbum, hytteregnskap | |
 | 5 · Lansering | Invitasjon til alle hytteeiere | |
