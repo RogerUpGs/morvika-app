@@ -1,0 +1,21 @@
+import { useMe } from './session';
+import type { IconName } from '../components/Icon';
+
+export interface NavItem { key: string; label: string; icon: IconName; group: 'Min hytte' | 'Fellesskap' | 'Administrasjon' | 'Deg' }
+
+export function useNavItems(): NavItem[] {
+  const { cabins, roles } = useMe();
+  const items: NavItem[] = [];
+  if (cabins.length) items.push({ key: 'minhytte', label: 'Min hytte', icon: 'home', group: 'Min hytte' });
+  items.push(
+    { key: 'chat', label: 'Hyttepraten', icon: 'chat', group: 'Fellesskap' },
+    { key: 'nyheter', label: 'Nyheter', icon: 'news', group: 'Fellesskap' },
+    { key: 'varsler', label: 'Varsler', icon: 'bell', group: 'Fellesskap' },
+    { key: 'meldinger', label: 'Meldinger', icon: 'msg', group: 'Fellesskap' },
+    { key: 'arr', label: 'Arrangementer', icon: 'cal', group: 'Fellesskap' },
+    { key: 'info', label: 'Info og dokumenter', icon: 'info', group: 'Fellesskap' },
+  );
+  if (roles.includes('admin')) items.push({ key: 'admin', label: 'Administrasjon', icon: 'admin', group: 'Administrasjon' });
+  items.push({ key: 'profil', label: 'Min profil', icon: 'user', group: 'Deg' });
+  return items;
+}
