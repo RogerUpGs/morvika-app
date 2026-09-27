@@ -498,8 +498,9 @@ function Ledger({ cabinId, own, ledger, reload, toast, label }: {
             onDone={async () => { setEditing(null); await reload(); }} onCancel={() => setEditing(null)} />
         </div>
       </div>
-      <div className="card" style={{ marginTop: 16, padding: '6px 8px' }}>
-        <div className="tbl-wrap">
+      <div className="card ledgerbox" style={{ marginTop: 16 }}>
+        <div className="ledgerbox-h"><b>Bilag {year}</b><span className="muted">{L.length} {L.length === 1 ? 'post' : 'poster'}</span></div>
+        <div className="tbl-wrap scrollbox">
           <table>
             <thead><tr><th>Dato</th><th>Beskrivelse</th><th>Kategori</th><th className="r">Beløp</th><th /></tr></thead>
             <tbody>
