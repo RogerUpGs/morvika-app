@@ -47,19 +47,19 @@ export function Login() {
 
         {step === 'email' ? (
           <>
-            <div><h1>Logg inn</h1><p>Skriv inn e-postadressen du er invitert med. Du får en kode på e-post.</p></div>
+            <div><h1>Logg inn</h1><p>Skriv inn e-postadressen du er invitert med. Du får en e-post som logger deg inn.</p></div>
             <form onSubmit={sendCode}>
               <label className="field" htmlFor="login-email">E-post
                 <input id="login-email" type="email" autoComplete="email" inputMode="email" required
                   value={email} onChange={(e) => setEmail(e.target.value)} placeholder="navn@eksempel.no" />
               </label>
               {err && <p className="err" role="alert">{err}</p>}
-              <button className="btn primary" disabled={busy}><Icon name="mail" size={18} />{busy ? 'Sender …' : 'Send meg en kode'}</button>
+              <button className="btn primary" disabled={busy}><Icon name="mail" size={18} />{busy ? 'Sender …' : 'Send meg innlogging på e-post'}</button>
             </form>
           </>
         ) : (
           <>
-            <div><h1>Skriv inn koden</h1><p>Vi har sendt en kode til <b>{email}</b>. Den kan ta et minutt å komme fram. Sjekk også søppelpost.</p></div>
+            <div><h1>Sjekk e-posten din</h1><p>Vi har sendt en e-post til <b>{email}</b>. Trykk på lenken i e-posten, eller skriv inn koden under hvis e-posten har en. Det kan ta et minutt før den kommer fram. Sjekk også søppelpost.</p></div>
             <form onSubmit={verify}>
               <label className="field" htmlFor="login-code">Kode
                 <input id="login-code" className="codeinput" inputMode="numeric" autoComplete="one-time-code"
@@ -70,7 +70,7 @@ export function Login() {
               <button className="btn primary" disabled={busy || code.length < 6}>{busy ? 'Logger inn …' : 'Logg inn'}</button>
             </form>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-              <button className="linkbtn2" type="button" onClick={() => void sendCode()} disabled={busy}>Send ny kode</button>
+              <button className="linkbtn2" type="button" onClick={() => void sendCode()} disabled={busy}>Send e-posten på nytt</button>
               <button className="linkbtn2" type="button" onClick={() => { setStep('email'); setErr(null); }}>Bruk en annen e-post</button>
             </div>
           </>

@@ -17,11 +17,11 @@ Bare inviterte skal kunne logge inn.
 2. Slå **av** «Allow new users to sign up». Sjekk at **Email** fortsatt er slått på.
 3. Trykk **Save**.
 
-## 3. Endre e-posten med innloggingskoden
+## 3. E-posten med innloggingskoden (venter)
 
-1. Gå til **Authentication → Emails** (eller **Email Templates**) og velg malen **Magic Link**.
-2. **Subject:** `Din innloggingskode til Mørvika`
-3. **Body:** erstatt alt med:
+Supabase lar oss ikke endre e-postmalene før prosjektet har en egen e-posttjeneste (SMTP). Inntil da sender Supabase en e-post med lenken «Sign in», som logger deg rett inn. Det holder for testing.
+
+Før hytteeierne inviteres, setter vi opp en egen e-posttjeneste (for eksempel Brevo eller Resend) og endrer malen **Magic link or OTP** til å vise koden:
 
 ```html
 <h2>Innloggingskode</h2>
@@ -29,10 +29,6 @@ Bare inviterte skal kunne logge inn.
 <p style="font-size:28px;font-weight:bold;letter-spacing:4px">{{ .Token }}</p>
 <p>Koden gjelder i én time. Har du ikke bedt om den, kan du se bort fra denne e-posten.</p>
 ```
-
-4. Trykk **Save changes**.
-
-Merk: Supabase sin innebygde e-post sender bare til medlemmer av Supabase-organisasjonen, og maks to e-poster i timen. Det holder for testing. Før hytteeierne inviteres, kobler vi til en egen e-posttjeneste.
 
 ## 4. Opprett din egen bruker
 
