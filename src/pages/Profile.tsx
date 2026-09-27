@@ -4,6 +4,7 @@ import { useMe } from '../lib/session';
 import { useToast } from '../lib/ui';
 import { ROLE_LABEL } from '../lib/types';
 import { Icon } from '../components/Icon';
+import { PushSettings } from '../components/PushCard';
 
 export function ProfilePage() {
   const me = useMe();
@@ -38,6 +39,8 @@ export function ProfilePage() {
         </label>
         <div className="actions full"><button className="btn primary" disabled={busy || name.trim().length < 2}>{busy ? 'Lagrer …' : 'Lagre'}</button></div>
       </form>
+
+      <PushSettings />
 
       <section className="card">
         <h3 className="serif" style={{ margin: '0 0 8px', fontSize: 18 }}>Hytter og roller</h3>

@@ -18,3 +18,13 @@ create function storage.foldername(name text) returns text[] language sql immuta
 grant usage on schema storage to authenticated;
 grant select, insert, delete on storage.objects to authenticated;
 grant execute on function storage.foldername(text) to authenticated;
+do $$ begin create role service_role nologin bypassrls; exception when duplicate_object then null; end $$;
+-- pg_net: signalene samles i en tabell i stedet for å sendes
+create schema extensions;
+create schema net;
+create table net.calls (id bigserial primary key, url text, body jsonb);
+create function net.http_post(url text, body jsonb, headers jsonb) returns bigint language sql as
+  $$ insert into net.calls (url, body) values (url, body) returning id $$;
+grant usage on schema net to authenticated;
+grant insert on net.calls to authenticated;
+grant usage on sequence net.calls_id_seq to authenticated;

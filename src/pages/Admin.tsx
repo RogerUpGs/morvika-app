@@ -5,6 +5,7 @@ import { useToast } from '../lib/ui';
 import { dShort } from '../lib/format';
 import { ROLE_LABEL, type AppRole, type Area } from '../lib/types';
 import { Icon } from '../components/Icon';
+import { PushSetup } from '../components/PushSetup';
 
 /* ---------- Typer ---------- */
 interface AdminCabin {
@@ -41,7 +42,7 @@ function StatusPill({ s }: { s: PersonStatus }) {
 
 /* ---------- Hovedside ---------- */
 export function AdminPage() {
-  const [tab, setTab] = useState<'hytter' | 'personer'>('hytter');
+  const [tab, setTab] = useState<'hytter' | 'personer' | 'oppsett'>('hytter');
   const [cabins, setCabins] = useState<AdminCabin[] | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -66,9 +67,11 @@ export function AdminPage() {
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'hytter'} className={tab === 'hytter' ? 'on' : ''} onClick={() => setTab('hytter')}>Hytter og eiere</button>
         <button role="tab" aria-selected={tab === 'personer'} className={tab === 'personer' ? 'on' : ''} onClick={() => setTab('personer')}>Personer og roller</button>
+        <button role="tab" aria-selected={tab === 'oppsett'} className={tab === 'oppsett' ? 'on' : ''} onClick={() => setTab('oppsett')}>Oppsett</button>
       </div>
-      {err && <div className="empty">{err} <button className="linkbtn2" onClick={() => void load()}>Prøv igjen</button></div>}
-      {!err && cabins === null && <div className="empty">Henter registeret …</div>}
+      {tab === 'oppsett' && <PushSetup />}
+      {tab !== 'oppsett' && err && <div className="empty">{err} <button className="linkbtn2" onClick={() => void load()}>Prøv igjen</button></div>}
+      {tab !== 'oppsett' && !err && cabins === null && <div className="empty">Henter registeret …</div>}
       {!err && cabins !== null && tab === 'hytter' && <CabinsTab cabins={cabins} people={people} notes={notes} reload={load} />}
       {!err && cabins !== null && tab === 'personer' && <PeopleTab cabins={cabins} people={people} reload={load} />}
     </>

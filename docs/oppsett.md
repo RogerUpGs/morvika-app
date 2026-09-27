@@ -78,6 +78,7 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260927180000_tomtetype.sql` | Tomtetype på hytta: festetomt eller selveiertomt | 27. sep 2026 |
 | `20260927190000_betegnelse.sql` | Veinavn i betegnelsen på hytter som allerede er registrert | 27. sep 2026 |
 | `20260927200000_varsler.sql` | Oversikt over hvem som har bekreftet et varsel | |
+| `20260927210000_push.sql` | Push-varsler: signal til Edge Function, mottakere, abonnement | |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 
@@ -90,3 +91,14 @@ Hytteeierne får konto automatisk første gang de logger inn, men bare hvis e-po
 5. Gå til **Authentication → Sign In / Providers** og slå **på** «Allow new users to sign up». Trykk **Save changes**.
 
 Rekkefølgen er viktig: hooken først, deretter påmelding. Uten hooken kunne hvem som helst laget en konto, men de ville ikke sett noe innhold.
+
+## Push-varsler til telefonen (etter `20260927210000_push.sql`)
+
+1. **Kjør databasefilen** `20260927210000_push.sql` i SQL Editor.
+2. **Lag nøkler i appen:** Administrasjon → Oppsett → «Lag nøkler for push». La siden stå åpen.
+3. **Legg inn nøklene i Supabase:** Edge Functions → Secrets → legg til `VAPID_PUBLIC_KEY` og `VAPID_PRIVATE_KEY` med verdiene fra appen.
+4. **Lag funksjonen:** Edge Functions → Deploy a new function → Via Editor. Navn: `push`. Lim inn innholdet i `supabase/functions/push/index.ts` og trykk Deploy.
+5. **Slå av JWT-sjekken:** åpne funksjonen `push` → Details (eller Settings) → slå **av** «Verify JWT» / «Enforce JWT verification» → Save. Databasen kaller funksjonen uten innlogging; funksjonen sender bare for rader som er nye og ikke varslet før.
+6. **Test:** Åpne appen på telefonen (iPhone: lagt på Hjem-skjerm), trykk «Slå på varsler». Send et varsel fra PC-en til en gruppe telefonen er med i.
+
+Feilsøking: Edge Functions → push → Logs viser hvor mange som fikk varsel (`sent`). Ingen logglinjer betyr at databasen ikke når funksjonen (sjekk at pg_net er slått på under Database → Extensions).

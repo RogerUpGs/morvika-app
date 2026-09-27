@@ -5,6 +5,7 @@ import { dShort, firstName, greeting } from '../lib/format';
 import { Icon } from '../components/Icon';
 import { useNavItems } from '../lib/nav';
 import { useBadges } from '../lib/badges';
+import { PushPrompt } from '../components/PushCard';
 
 /** Telefonens startside: store knapper, to i bredden. */
 export function Home({ go }: { go: (r: string) => void }) {
@@ -51,6 +52,7 @@ export function Home({ go }: { go: (r: string) => void }) {
         <h2>{greeting()}, {firstName(me.profile?.full_name ?? '')}</h2>
         <p>{me.cabins.length ? `${me.cabins.map((c) => c.label).join(', ')} · ` : ''}{place}</p>
       </div>
+      <PushPrompt />
       <div className="tiles">
         {tiles.map((it) => (
           <button key={it.key} className={`tile2 t-${it.key} ${it.key === 'varsler' && akutt ? 'akutt' : ''}`} onClick={() => go(it.key)}>

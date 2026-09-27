@@ -328,6 +328,40 @@ select pg_temp.check('administrator kan endre navn og mobil',
   (select full_name || '|' || phone from public.admin_people() where id = '00000000-0000-0000-0000-000000000201') = 'Anne M. Hansen|900 11 333');
 
 -- ---------------------------------------------------------------------
+-- Push-varsler
+-- ---------------------------------------------------------------------
+reset role;
+grant usage on schema public to service_role;
+grant select on all tables in schema public to service_role;   -- som i Supabase
+select pg_temp.check('nye rader gir signal til push-funksjonen',
+  (select count(*) from net.calls where body->>'table' in ('alerts','news','messages','post_comments')) >= 5);
+set role service_role;
+select pg_temp.check('akutt varsel fra Veilaget går til Veilagets medlemmer, ikke avsender',
+  (select string_agg(p.full_name, ',' order by p.full_name) from public.push_targets('alerts', (select id from public.alerts where title = 'Veien stengt fredag')) t join public.profiles p on p.id = t.user_id)
+  like '%Per Strand%' and not exists (select 1 from public.push_targets('alerts', gen_random_uuid())));
+select pg_temp.check('samme varsel sendes bare én gang',
+  not exists (select 1 from public.push_targets('alerts', (select id from public.alerts where title = 'Veien stengt fredag'))));
+select pg_temp.check('melding fra hytteeier til grunneier går til grunneier',
+  (select array_agg(t.user_id) from public.push_targets('messages', (select id from public.messages where body = 'Kan jeg felle to furuer?')) t)
+  = array['00000000-0000-0000-0000-000000000001'::uuid]);
+reset role;
+insert into public.notification_prefs (user_id, news) values ('00000000-0000-0000-0000-000000000047', false);
+set role service_role;
+select pg_temp.check('nyhet går ikke til den som har slått av nyhetsvarsler',
+  not exists (select 1 from public.push_targets('news', (select id from public.news where title = 'Vannet stenges')) where user_id = '00000000-0000-0000-0000-000000000047'));
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000047';
+select pg_temp.denied('hytteeier kan ikke hente push-mottakere', $$select * from public.push_targets('alerts', gen_random_uuid())$$);
+select public.save_push_subscription('https://push.example/abc', 'p', 'a', 'test');
+select pg_temp.check('hytteeier kan lagre push-abonnement', (select count(*) from public.push_subscriptions) = 1);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select public.save_push_subscription('https://push.example/abc', 'p2', 'a2', 'test');
+select pg_temp.check('samme telefon flyttes til ny bruker', (select count(*) from public.push_subscriptions) = 1);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000047';
+select pg_temp.check('forrige bruker har ikke abonnementet lenger', (select count(*) from public.push_subscriptions) = 0);
+
+-- ---------------------------------------------------------------------
 -- Uinvitert og anonym
 -- ---------------------------------------------------------------------
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000999';
