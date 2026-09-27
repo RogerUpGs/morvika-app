@@ -10,6 +10,10 @@ interface Me {
   cabins: Cabin[];
   /** Eier hytte eller har en rolle. Uinviterte ser ingenting. */
   isResident: boolean;
+  /** Bare Veilaget: eier bare hytter i Torpum (tilgang «veilag») og har ingen rolle. */
+  veilagOnly: boolean;
+  /** Hytter med full tilgang (Min hytte). */
+  fullCabins: Cabin[];
   loading: boolean;
   error: string | null;
   reload: () => Promise<void>;
@@ -36,7 +40,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const [p, r, c] = await Promise.all([
       supabase.rpc('my_profile').maybeSingle<Profile>(),
       supabase.from('user_roles').select('role').eq('user_id', uid),
-      supabase.from('cabin_owners').select('cabin:cabins(id,area,number,label,gnr,bnr,vel_member,vei_member)').eq('user_id', uid),
+      supabase.from('cabin_owners').select('cabin:cabins(id,area,number,label,gnr,bnr,vel_member,vei_member,access)').eq('user_id', uid),
     ]);
     const firstError = p.error ?? r.error ?? c.error;
     if (firstError) setError(firstError.message);
@@ -70,6 +74,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const value: Me = {
     session, profile, roles, cabins, loading, error,
     isResident: roles.length > 0 || cabins.length > 0,
+    veilagOnly: roles.length === 0 && cabins.length > 0 && cabins.every((c) => c.access === 'veilag'),
+    fullCabins: cabins.filter((c) => c.access === 'full'),
     reload: () => loadMe(session),
     signOut: async () => { await supabase.auth.signOut(); },
   };

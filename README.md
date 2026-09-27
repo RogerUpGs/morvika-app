@@ -1,6 +1,6 @@
 # Mørvika Hytteområde
 
-Web-app (PWA) for kommunikasjon mellom grunneier, Mørvika Vel, Mørvika Veiforening og hytteeierne i Mørvika og Sandbukta. Én app for PC, nettbrett og telefon.
+Web-app (PWA) for kommunikasjon mellom grunneier, Mørvika Vel, Mørvikveien Veilag og hytteeierne i Mørvika og Torpum. Én app for PC, nettbrett og telefon.
 
 - **Prototype:** https://claude.ai/artifact/8TNfg7E5mpENvt7xEm34RR
 - **Oppsett av Supabase og Cloudflare:** [docs/oppsett.md](docs/oppsett.md)
@@ -32,8 +32,9 @@ Web-app (PWA) for kommunikasjon mellom grunneier, Mørvika Vel, Mørvika Veifore
 
 - Ingenting er åpent for anonyme brukere.
 - Bare inviterte (eier av en hytte, eller med en rolle) ser innhold.
-- Nyheter, varsler og arrangementer vises for mottakergruppen: alle, Mørvika, Sandbukta, Vel-medlemmer eller Vei-medlemmer.
-- Meldinger ses bare av hytteeieren og mottakeren (grunneier, styret i Vel eller styret i Veiforeningen).
-- Min hytte ses bare av hyttas eiere. Grunneier og administrator har ingen unntak.
+- Nyheter, varsler og arrangementer vises for mottakergruppen: alle, Mørvika, Torpum, Vel-medlemmer eller Veilag-medlemmer.
+- Torpum (ekstern eiendom, tilgang «veilag») ser bare det som kommer fra Mørvikveien Veilag: nyheter, varsler, arrangementer, dokumenter og meldinger til Veilagets styre.
+- Meldinger ses bare av hytteeieren og mottakeren (grunneier, styret i Vel eller styret i Mørvikveien Veilag).
+- Min hytte ses bare av hyttas eiere, og bare for hytter med full tilgang. Grunneier og administrator har ingen unntak.
 - E-post og telefonnummer er skjult for andre brukere.
 - Den første brukeren som opprettes, blir grunneier og administrator.

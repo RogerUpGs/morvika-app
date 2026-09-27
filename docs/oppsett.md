@@ -59,3 +59,12 @@ Før hytteeierne inviteres, setter vi opp en egen e-posttjeneste (for eksempel B
 
 - **iPhone:** Safari → Del → «Legg til på Hjem-skjerm».
 - **Android:** Chrome → menyen → «Installer app».
+
+## Oppdateringer av databasen
+
+Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte som i steg 1: kopier filen fra GitHub, lim den inn i **SQL Editor** og trykk **Run**. Filene kjøres i rekkefølge etter navnet, og hver fil bare én gang.
+
+| Fil | Innhold | Kjørt |
+| --- | --- | --- |
+| `20260927120000_grunnmur.sql` | Tabeller, tilgangsregler og lagring | 27. sep 2026 |
+| `20260927143000_torpum_veilag.sql` | Torpum og tilgangsnivået «Bare Veilaget» | |

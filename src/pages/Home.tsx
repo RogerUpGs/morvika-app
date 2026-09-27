@@ -30,16 +30,16 @@ export function Home({ go }: { go: (r: string) => void }) {
   const sub: Record<string, string> = {
     minhytte: me.cabins[0]?.label ?? '',
     chat: 'Del bilder og nytt',
-    nyheter: unreadNews ? `${unreadNews} nye` : lastNews ? `Siste ${dShort(lastNews)}` : 'Fra styret og grunneier',
+    nyheter: unreadNews ? `${unreadNews} ${unreadNews === 1 ? 'ny' : 'nye'}` : lastNews ? `Siste ${dShort(lastNews)}` : me.veilagOnly ? 'Fra Veilaget' : 'Fra styret og grunneier',
     varsler: 'Viktige beskjeder',
-    meldinger: 'Til grunneier og styret',
+    meldinger: me.veilagOnly ? 'Til Veilagets styre' : 'Til grunneier og styret',
     arr: 'Dugnad og treff',
     info: 'Dokumenter og kontakter',
     admin: 'Brukere og roller',
   };
   const order = ['chat', 'nyheter', 'varsler', 'meldinger', 'minhytte', 'arr', 'info', 'admin'];
   const tiles = order.map((k) => items.find((i) => i.key === k)).filter((x): x is NonNullable<typeof x> => Boolean(x));
-  const place = me.cabins[0]?.area === 'sandbukta' ? 'Sandbukta' : 'Mørvika hytteområde';
+  const place = me.cabins[0]?.area === 'torpum' ? 'Torpum' : 'Mørvika hytteområde';
 
   return (
     <>

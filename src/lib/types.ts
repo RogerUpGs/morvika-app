@@ -1,6 +1,7 @@
-export type Area = 'morvika' | 'sandbukta';
+export type Area = 'morvika' | 'torpum';
+export type CabinAccess = 'full' | 'veilag';
 export type AppRole = 'grunneier' | 'styre_vel' | 'styre_vei' | 'admin';
-export type Audience = 'alle' | 'morvika' | 'sandbukta' | 'vel' | 'vei';
+export type Audience = 'alle' | 'morvika' | 'torpum' | 'vel' | 'vei';
 export type Sender = 'grunneier' | 'vel' | 'vei' | 'admin';
 
 export interface Cabin {
@@ -12,6 +13,8 @@ export interface Cabin {
   bnr: number | null;
   vel_member: boolean;
   vei_member: boolean;
+  /** full = vanlig hytteeier, veilag = ser bare det som kommer fra Mørvikveien Veilag (Torpum) */
+  access: CabinAccess;
 }
 
 export interface Profile {
@@ -35,23 +38,23 @@ export interface News {
 export const ROLE_LABEL: Record<AppRole, string> = {
   grunneier: 'Grunneier',
   styre_vel: 'Styret Vel',
-  styre_vei: 'Styret Vei',
+  styre_vei: 'Styret Veilag',
   admin: 'Administrator',
 };
 
 export const SENDER_LABEL: Record<Sender, string> = {
   grunneier: 'Grunneier',
   vel: 'Mørvika Vel',
-  vei: 'Mørvika Veiforening',
+  vei: 'Mørvikveien Veilag',
   admin: 'Administrator',
 };
 
 export const AUDIENCE_LABEL: Record<Audience, string> = {
   alle: 'Alle',
   morvika: 'Mørvika hytteområde',
-  sandbukta: 'Sandbukta (ekstern eiendom)',
+  torpum: 'Torpum (ekstern eiendom)',
   vel: 'Medlemmer i Mørvika Vel',
-  vei: 'Medlemmer i Mørvika Veiforening',
+  vei: 'Medlemmer i Mørvikveien Veilag',
 };
 
 /** Avsendere en bruker kan publisere som, ut fra rollene. */

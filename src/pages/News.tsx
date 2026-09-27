@@ -6,7 +6,7 @@ import { dLong } from '../lib/format';
 import { AUDIENCE_LABEL, SENDER_LABEL, sendersFor, type Audience, type News, type Sender } from '../lib/types';
 import { Icon } from '../components/Icon';
 
-const FILTERS: [Sender | 'alle', string][] = [['alle', 'Alle'], ['grunneier', 'Grunneier'], ['vel', 'Mørvika Vel'], ['vei', 'Veiforeningen']];
+const FILTERS: [Sender | 'alle', string][] = [['alle', 'Alle'], ['grunneier', 'Grunneier'], ['vel', 'Mørvika Vel'], ['vei', 'Veilaget']];
 const AUDIENCES = Object.keys(AUDIENCE_LABEL) as Audience[];
 
 function Badge({ s }: { s: Sender }) {
@@ -71,7 +71,9 @@ export function NewsPage() {
         <p className="lede">
           {canPost
             ? `Oppslag fra grunneier og foreningene. Du kan publisere som ${senders.map((s) => SENDER_LABEL[s]).join(' og ')}.`
-            : 'Oppslag fra grunneier, Velet og Veiforeningen som gjelder deg.'}
+            : me.veilagOnly
+              ? 'Oppslag fra Mørvikveien Veilag.'
+              : 'Oppslag fra grunneier, Velet og Veilaget som gjelder deg.'}
         </p>
         {canPost && (
           <button className="btn primary" onClick={() => setShowForm((v) => !v)}><Icon name="plus" size={18} />Nytt oppslag</button>
@@ -80,11 +82,11 @@ export function NewsPage() {
 
       {canPost && showForm && <NewsForm senders={senders} onDone={() => { setShowForm(false); void load(); }} onCancel={() => setShowForm(false)} />}
 
-      <div className="chips" role="group" aria-label="Filtrer etter avsender">
+      {!me.veilagOnly && <div className="chips" role="group" aria-label="Filtrer etter avsender">
         {FILTERS.map(([k, t]) => (
           <button key={k} className={`chip ${filter === k ? 'on' : ''}`} onClick={() => setFilter(k)} aria-pressed={filter === k}>{t}</button>
         ))}
-      </div>
+      </div>}
 
       {loadErr && <div className="empty">{loadErr} <button className="linkbtn2" onClick={() => void load()}>Prøv igjen</button></div>}
       {!loadErr && news === null && <div className="empty">Henter nyheter …</div>}
@@ -142,13 +144,17 @@ function NewsForm({ senders, onDone, onCancel }: { senders: Sender[]; onDone: ()
   return (
     <form className="card form" onSubmit={submit}>
       <label className="field" htmlFor="news-sender">Fra
-        <select id="news-sender" value={sender} onChange={(e) => setSender(e.target.value as Sender)}>
+        <select id="news-sender" value={sender} onChange={(e) => {
+          const s = e.target.value as Sender;
+          setSender(s);
+          if (s !== 'vei' && audience === 'torpum') setAudience('alle');
+        }}>
           {senders.map((s) => <option key={s} value={s}>{SENDER_LABEL[s]}</option>)}
         </select>
       </label>
       <label className="field" htmlFor="news-aud">Til
         <select id="news-aud" value={audience} onChange={(e) => setAudience(e.target.value as Audience)}>
-          {AUDIENCES.map((a) => <option key={a} value={a}>{AUDIENCE_LABEL[a]}</option>)}
+          {AUDIENCES.filter((a) => a !== 'torpum' || sender === 'vei').map((a) => <option key={a} value={a}>{AUDIENCE_LABEL[a]}</option>)}
         </select>
       </label>
       <label className="field full" htmlFor="news-title">Overskrift

@@ -1,3 +1,5 @@
+import { useMe } from '../lib/session';
+
 const PROTOTYPE = 'https://claude.ai/artifact/8TNfg7E5mpENvt7xEm34RR';
 
 const INFO: Record<string, { phase: string; title: string; points: string[] }> = {
@@ -7,11 +9,21 @@ const INFO: Record<string, { phase: string; title: string; points: string[] }> =
   meldinger: { phase: 'Fase 3', title: 'Meldinger', points: ['Private samtaler med grunneier eller styrene', 'Bilder fra telefonen i samtalen'] },
   arr: { phase: 'Fase 3', title: 'Arrangementer og dugnad', points: ['Kalender med påmelding', 'Arrangøren ser hvor mange som kommer'] },
   info: { phase: 'Fase 3', title: 'Info og dokumenter', points: ['Vedtekter, brøyteplan og kart', 'Kontakter til styrene og grunneier'] },
-  admin: { phase: 'Fase 2', title: 'Administrasjon', points: ['Hytter, eiere og medlemskap i Vel og Veiforening', 'Brukerregister med knapp for ny QR-kode', 'Siste innlogging, innloggede enheter og utlogging fra alle enheter'] },
+  admin: { phase: 'Fase 2', title: 'Administrasjon', points: ['Hytter, eiere og medlemskap i Vel og Veilag', 'Brukerregister med knapp for ny QR-kode', 'Siste innlogging, innloggede enheter og utlogging fra alle enheter'] },
+};
+
+/** Det Torpum-brukere får se, som bare har tilgang til Veilaget. */
+const VEILAG: Record<string, string[]> = {
+  varsler: ['Varsler fra Mørvikveien Veilag', 'Push til telefonen, e-post som reserve', '«Jeg har sett varselet»'],
+  meldinger: ['Private samtaler med Veilagets styre', 'Bilder fra telefonen i samtalen, for eksempel av hull i veien'],
+  arr: ['Årsmøter og dugnader i Veilaget, med påmelding'],
+  info: ['Vedtekter og brøyteplan fra Veilaget', 'Kontakt til Veilagets styre'],
 };
 
 export function ComingSoon({ view }: { view: string }) {
-  const i = INFO[view];
+  const { veilagOnly } = useMe();
+  const base = INFO[view];
+  const i = base && veilagOnly && VEILAG[view] ? { ...base, points: VEILAG[view] } : base;
   if (!i) return null;
   return (
     <section className="card soon">

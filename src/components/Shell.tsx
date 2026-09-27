@@ -27,7 +27,8 @@ export function Shell() {
   useEffect(() => { document.title = `${TITLES[view] ?? 'Mørvika'} · Mørvika`; }, [view]);
 
   const groups = ['Min hytte', 'Fellesskap', 'Administrasjon'] as const;
-  const eyebrow = view === 'hjem' ? 'Mørvika hytteområde' : items.find((i) => i.key === view)?.group ?? 'Fellesskap';
+  const eyebrow = me.veilagOnly ? 'Mørvikveien Veilag'
+    : view === 'hjem' ? 'Mørvika hytteområde' : items.find((i) => i.key === view)?.group ?? 'Fellesskap';
 
   let page: ReactNode;
   switch (view) {

@@ -4,11 +4,11 @@ import type { IconName } from '../components/Icon';
 export interface NavItem { key: string; label: string; icon: IconName; group: 'Min hytte' | 'Fellesskap' | 'Administrasjon' | 'Deg' }
 
 export function useNavItems(): NavItem[] {
-  const { cabins, roles } = useMe();
+  const { fullCabins, roles, veilagOnly } = useMe();
   const items: NavItem[] = [];
-  if (cabins.length) items.push({ key: 'minhytte', label: 'Min hytte', icon: 'home', group: 'Min hytte' });
+  if (fullCabins.length) items.push({ key: 'minhytte', label: 'Min hytte', icon: 'home', group: 'Min hytte' });
+  if (!veilagOnly) items.push({ key: 'chat', label: 'Hyttepraten', icon: 'chat', group: 'Fellesskap' });
   items.push(
-    { key: 'chat', label: 'Hyttepraten', icon: 'chat', group: 'Fellesskap' },
     { key: 'nyheter', label: 'Nyheter', icon: 'news', group: 'Fellesskap' },
     { key: 'varsler', label: 'Varsler', icon: 'bell', group: 'Fellesskap' },
     { key: 'meldinger', label: 'Meldinger', icon: 'msg', group: 'Fellesskap' },
