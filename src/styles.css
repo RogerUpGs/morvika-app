@@ -518,3 +518,25 @@ td.num{white-space:nowrap}
 .chosen b,.pickl b{font-weight:700}
 .chosen > span{display:flex;flex-direction:column;min-width:0}
 .chosen .muted{font-size:13px}
+.news-img{margin-top:12px;border-radius:10px;overflow:hidden;max-width:640px}
+
+/* ---------- Del fra feltet ---------- */
+.fieldbtn{display:flex;align-items:center;gap:14px;width:100%;max-width:640px;margin:0 0 14px;padding:16px 18px;border:0;border-radius:16px;background:var(--ink);color:var(--bg);font:inherit;text-align:left;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,.18)}
+.fieldbtn b{display:block;font-size:19px}
+.fieldbtn small{display:block;font-size:14px;opacity:.75}
+.fieldbtn .ic{flex:none;width:52px;height:52px;border-radius:14px;display:grid;place-items:center;background:var(--primary);color:var(--primary-ink)}
+.quickpost{max-width:640px;display:flex;flex-direction:column;gap:14px}
+.qp-pick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.qp-pick label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:110px;border:2px dashed var(--line-2);border-radius:14px;cursor:pointer;font-weight:700;color:var(--ink);background:var(--surface)}
+.qp-pick label svg{color:var(--primary)}
+.qp-pick input{display:none}
+.qp-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
+.qp-thumbs .t{position:relative;aspect-ratio:1;border-radius:10px;background-size:cover;background-position:center;border:1px solid var(--line)}
+.qp-thumbs .t button{position:absolute;top:5px;right:5px;width:28px;height:28px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;display:grid;place-items:center;cursor:pointer}
+.qp-thumbs .add{display:grid;place-items:center;aspect-ratio:1;border:2px dashed var(--line-2);border-radius:10px;cursor:pointer;color:var(--primary)}
+.qp-thumbs .add input{display:none}
+.quickpost textarea{min-height:120px;font-size:17px}
+.qp-opts{display:flex;flex-direction:column;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.qp-opts .row{display:flex;gap:10px;flex-wrap:wrap}
+.qp-opts .row > label{flex:1 1 150px}
+.qp-send{min-height:56px!important;font-size:18px!important;justify-content:center}

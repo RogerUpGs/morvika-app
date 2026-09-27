@@ -31,6 +31,7 @@ export interface News {
   title: string;
   body: string;
   notify: boolean;
+  images: string[];
   created_at: string;
   created_by: string | null;
 }

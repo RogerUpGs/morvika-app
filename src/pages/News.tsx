@@ -5,6 +5,8 @@ import { useToast } from '../lib/ui';
 import { dLong } from '../lib/format';
 import { AUDIENCE_LABEL, SENDER_LABEL, sendersFor, type Audience, type News, type Sender } from '../lib/types';
 import { Icon } from '../components/Icon';
+import { DraftStrip, PhotoGrid } from '../components/Media';
+import { toDrafts, uploadImages, MAX_IMAGES, type Draft } from '../lib/images';
 
 const FILTERS: [Sender | 'alle', string][] = [['alle', 'Alle'], ['grunneier', 'Grunneier'], ['vel', 'Mørvika Vel'], ['vei', 'Veilaget']];
 const AUDIENCES = Object.keys(AUDIENCE_LABEL) as Audience[];
@@ -30,7 +32,7 @@ export function NewsPage() {
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from('news')
-      .select('id,sender,audience,title,body,notify,created_at,created_by')
+      .select('id,sender,audience,title,body,notify,images,created_at,created_by')
       .order('created_at', { ascending: false })
       .limit(100);
     if (error) { setLoadErr('Nyhetene kunne ikke hentes. Sjekk nettet og prøv igjen.'); return; }
@@ -59,10 +61,12 @@ export function NewsPage() {
   const shown = useMemo(() => (news ?? []).filter((n) => filter === 'alle' || n.sender === filter), [news, filter]);
 
   async function remove(id: string) {
+    const n = (news ?? []).find((x) => x.id === id);
     const { error } = await supabase.from('news').delete().eq('id', id);
     setConfirmDel(null);
-    if (error) toast('Oppslaget ble ikke slettet. Prøv igjen.');
-    else { toast('Oppslaget er slettet.'); void load(); }
+    if (error) { toast('Oppslaget ble ikke slettet. Prøv igjen.'); return; }
+    if (n?.images?.length) await supabase.storage.from('nyheter').remove(n.images);
+    toast('Oppslaget er slettet.'); void load();
   }
 
   return (
@@ -76,7 +80,10 @@ export function NewsPage() {
               : 'Oppslag fra grunneier, Velet og Veilaget som gjelder deg.'}
         </p>
         {canPost && (
-          <button className="btn primary" onClick={() => setShowForm((v) => !v)}><Icon name="plus" size={18} />Nytt oppslag</button>
+          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn primary" onClick={() => { window.location.hash = 'del'; }}><Icon name="camera" size={18} />Del fra feltet</button>
+            <button className="btn" onClick={() => setShowForm((v) => !v)}><Icon name="plus" size={18} />Nytt oppslag</button>
+          </span>
         )}
       </div>
 
@@ -95,10 +102,11 @@ export function NewsPage() {
         {shown.map((n) => {
           const mine = n.created_by === me.session?.user.id;
           return (
-            <article key={n.id} className="card news">
+            <article key={n.id} className={`card news ${n.images?.length ? 'has-img' : ''}`}>
               <div className="meta"><Badge s={n.sender} /><span>{dLong(n.created_at)}</span>{n.notify && <span className="pill">Varsel</span>}</div>
               <h3 className="serif">{n.title}</h3>
               {n.body && <p style={{ whiteSpace: 'pre-line' }}>{n.body}</p>}
+              {n.images?.length > 0 && <div className="news-img"><PhotoGrid bucket="nyheter" paths={n.images} /></div>}
               <div className="foot">
                 <span>Til: {AUDIENCE_LABEL[n.audience]}</span>
                 {canPost && <span className="num">Lest av {readCounts[n.id] ?? 0}{sizes[n.audience] ? ` av ${sizes[n.audience]} hytteeiere` : ''}</span>}
@@ -130,13 +138,20 @@ function NewsForm({ senders, onDone, onCancel }: { senders: Sender[]; onDone: ()
   const [body, setBody] = useState('');
   const [notify, setNotify] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const { error } = await supabase.from('news').insert({ sender, audience, title: title.trim(), body: body.trim(), notify });
+    let images: string[] = [];
+    try { if (drafts.length) images = await uploadImages('nyheter', sender, drafts); }
+    catch { setBusy(false); toast('Bildene ble ikke lastet opp. Sjekk nettet og prøv igjen.'); return; }
+    const { error } = await supabase.from('news').insert({ sender, audience, title: title.trim(), body: body.trim(), notify, images });
     setBusy(false);
-    if (error) { toast('Oppslaget ble ikke publisert. Prøv igjen.'); return; }
+    if (error) {
+      if (images.length) await supabase.storage.from('nyheter').remove(images);
+      toast('Oppslaget ble ikke publisert. Prøv igjen.'); return;
+    }
     toast('Oppslaget er publisert.');
     onDone();
   }
@@ -164,8 +179,20 @@ function NewsForm({ senders, onDone, onCancel }: { senders: Sender[]; onDone: ()
       <label className="field full" htmlFor="news-body">Tekst
         <textarea id="news-body" value={body} onChange={(e) => setBody(e.target.value)} />
       </label>
+      <div className="full photorow">
+        <label className="cambtn" title="Legg ved bilder" aria-label="Legg ved bilder">
+          <Icon name="camera" size={22} />
+          <input type="file" accept="image/*" multiple hidden onChange={(e) => {
+            const { drafts: add, skipped } = toDrafts(e.target.files, drafts.length);
+            setDrafts((d) => [...d, ...add]); e.target.value = '';
+            if (skipped) toast(`Du kan legge ved opptil ${MAX_IMAGES} bilder.`);
+          }} />
+        </label>
+        <span className="muted" style={{ fontSize: 14 }}>Legg ved bilder</span>
+      </div>
+      {drafts.length > 0 && <div className="full"><DraftStrip drafts={drafts} className="mdrafts" onRemove={(k) => setDrafts((d) => d.filter((x) => x.key !== k))} /></div>}
       <label className="check full"><input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
-        Varsle mottakerne (push-varsler kommer i en senere versjon)</label>
+        Send push-varsel til mottakerne</label>
       <div className="actions full">
         <button type="button" className="btn ghost" onClick={onCancel}>Avbryt</button>
         <button className="btn primary" disabled={busy || !title.trim()}>{busy ? 'Publiserer …' : 'Publiser'}</button>

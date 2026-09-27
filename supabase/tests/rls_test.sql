@@ -351,6 +351,27 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000006';
 select pg_temp.check('Torpum-eier ser meldingen fra Veilaget', exists (select 1 from public.threads where subject = 'Brøyting i Torpum'));
 
 -- ---------------------------------------------------------------------
+-- Bilder i nyheter
+-- ---------------------------------------------------------------------
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+insert into storage.objects (bucket_id, name) values ('nyheter', 'grunneier/hyttetomt.jpg');
+insert into public.news (sender, audience, title, images) values ('grunneier', 'morvika', 'Ny vei til tomtene', array['grunneier/hyttetomt.jpg']);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000088';
+select pg_temp.denied('Veilagets styre kan ikke laste opp i grunneiers mappe',
+  $$insert into storage.objects (bucket_id, name) values ('nyheter', 'grunneier/falsk.jpg')$$);
+insert into storage.objects (bucket_id, name) values ('nyheter', 'vei/veien.jpg');
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+select pg_temp.check('hytteeier i Mørvika ser bildet i grunneiers nyhet',
+  exists (select 1 from storage.objects where bucket_id = 'nyheter' and name = 'grunneier/hyttetomt.jpg'));
+select pg_temp.check('hytteeier ser ikke bilder som ikke hører til en nyhet',
+  not exists (select 1 from storage.objects where bucket_id = 'nyheter' and name = 'vei/veien.jpg'));
+select pg_temp.denied('hytteeier kan ikke laste opp nyhetsbilder',
+  $$insert into storage.objects (bucket_id, name) values ('nyheter', 'grunneier/snikk.jpg')$$);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000006';
+select pg_temp.check('Torpum ser ikke bilder fra grunneiers nyhet',
+  not exists (select 1 from storage.objects where bucket_id = 'nyheter'));
+
+-- ---------------------------------------------------------------------
 -- Push-varsler
 -- ---------------------------------------------------------------------
 reset role;

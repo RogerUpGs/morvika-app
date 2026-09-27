@@ -12,11 +12,13 @@ import { AdminPage } from '../pages/Admin';
 import { ChatPage } from '../pages/Chat';
 import { AlertsPage, LEVEL_LABEL } from '../pages/Alerts';
 import { MessagesPage } from '../pages/Messages';
+import { QuickPostPage } from '../pages/QuickPost';
+import { sendersFor } from '../lib/types';
 import { useBadges } from '../lib/badges';
 
 const TITLES: Record<string, string> = {
   hjem: 'Hjem', minhytte: 'Min hytte', chat: 'Hyttepraten', nyheter: 'Nyheter', varsler: 'Varsler',
-  meldinger: 'Meldinger', arr: 'Arrangementer og dugnad', info: 'Info og dokumenter', admin: 'Administrasjon', profil: 'Min profil',
+  meldinger: 'Meldinger', del: 'Del fra feltet', arr: 'Arrangementer og dugnad', info: 'Info og dokumenter', admin: 'Administrasjon', profil: 'Min profil',
 };
 
 export function Shell() {
@@ -27,14 +29,15 @@ export function Shell() {
   const badges = useBadges();
   const pcStart = me.veilagOnly ? 'nyheter' : 'chat';
   const [route, go] = useRoute(isPhone ? 'hjem' : pcStart);
-  const known = route === 'hjem' || items.some((i) => i.key === route);
+  const canPost = sendersFor(me.roles).some((s) => s !== 'admin');
+  const known = route === 'hjem' || (route === 'del' && canPost) || items.some((i) => i.key === route);
   const view = known ? route : isPhone ? 'hjem' : pcStart;
 
   useEffect(() => { document.title = `${TITLES[view] ?? 'Mørvika'} · Mørvika`; }, [view]);
 
   const groups = ['Min hytte', 'Fellesskap', 'Administrasjon'] as const;
   const eyebrow = me.veilagOnly ? 'Mørvikveien Veilag'
-    : view === 'hjem' ? 'Mørvika hytteområde' : items.find((i) => i.key === view)?.group ?? 'Fellesskap';
+    : view === 'hjem' ? 'Mørvika hytteområde' : view === 'del' ? 'Nyheter' : items.find((i) => i.key === view)?.group ?? 'Fellesskap';
 
   const count = (k: string) => k === 'varsler' ? badges.openAlerts.length : k === 'meldinger' ? badges.unreadThreads : k === 'chat' ? badges.newPosts : 0;
   const top = badges.openAlerts.find((a) => a.level === 'akutt') ?? badges.openAlerts[0];
@@ -48,6 +51,7 @@ export function Shell() {
     case 'chat': page = <ChatPage />; break;
     case 'varsler': page = <AlertsPage />; break;
     case 'meldinger': page = <MessagesPage />; break;
+    case 'del': page = <QuickPostPage go={go} />; break;
     default: page = <ComingSoon view={view} />;
   }
 

@@ -6,6 +6,7 @@ import { Icon } from '../components/Icon';
 import { useNavItems } from '../lib/nav';
 import { useBadges } from '../lib/badges';
 import { PushPrompt } from '../components/PushCard';
+import { sendersFor } from '../lib/types';
 
 /** Telefonens startside: store knapper, to i bredden. */
 export function Home({ go }: { go: (r: string) => void }) {
@@ -52,6 +53,12 @@ export function Home({ go }: { go: (r: string) => void }) {
         <h2>{greeting()}, {firstName(me.profile?.full_name ?? '')}</h2>
         <p>{me.cabins.length ? `${me.cabins.map((c) => c.label).join(', ')} · ` : ''}{place}</p>
       </div>
+      {sendersFor(me.roles).some((s) => s !== 'admin') && (
+        <button className="fieldbtn" onClick={() => go('del')}>
+          <span className="ic"><Icon name="camera" size={28} /></span>
+          <span><b>Del fra feltet</b><small>Ta et bilde, skriv noen ord og publiser i Nyheter</small></span>
+        </button>
+      )}
       <PushPrompt />
       <div className="tiles">
         {tiles.map((it) => (
