@@ -616,11 +616,13 @@ tr.editing td{background:var(--primary-soft)}
 .scrollbox thead th{padding-top:12px}
 
 /* ---------- Hyttearkiv (administrasjon) ---------- */
-.archive{display:grid;grid-template-columns:280px minmax(0,1fr);gap:16px;align-items:start}
-.archive-list{padding:0;overflow:hidden}
-.archive-h{padding:10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
-.archive-scroll{padding:4px}
-.archive-cabin{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;border:0;background:none;padding:9px 10px;border-radius:8px;font:inherit;color:var(--ink);text-align:left;cursor:pointer}
-.archive-cabin:hover{background:var(--surface-2)}
-.archive-cabin.on{background:var(--primary-soft)}
-@media (max-width:900px){.archive{grid-template-columns:1fr}.archive-scroll{max-height:40vh}}
+.archive{display:flex;flex-direction:column;gap:16px}
+.archive-h{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;background:var(--topbar)}
+.archive-h input{flex:1 1 260px;width:auto}
+.archive-scroll{max-height:min(42vh,420px)}
+.picktable tbody tr{cursor:pointer}
+.picktable tbody tr:hover td{background:var(--surface-2)}
+.picktable tbody tr.on td{background:var(--primary-soft)}
+.picktable tbody tr:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.archive-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:16px;align-items:start}
+@media (max-width:900px){.archive-cols{grid-template-columns:1fr}.archive-scroll{max-height:45vh}}

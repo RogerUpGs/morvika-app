@@ -26,8 +26,8 @@ interface OwnerDraft { key: string; id?: string; name: string; email: string; ph
 const AREA_LABEL: Record<Area, string> = { morvika: 'Mørvika', torpum: 'Torpum' };
 const STATUS_LABEL: Record<PersonStatus, string> = { aktiv: 'Aktivert', venter: 'Ikke logget inn ennå', mangler_epost: 'Mangler e-post' };
 const ALL_ROLES: AppRole[] = ['grunneier', 'styre_vel', 'styre_vei', 'admin'];
-const labelFor = (area: Area, n: number | '') => (n === '' ? '' : area === 'torpum' ? `Torpum ${n}` : `Hytte ${n}`);
-/** «Hytte 4 · Mørvikveien»: nummer og vei, uten husnummer (betegnelsen ser alle hytteeiere) */
+const labelFor = (area: Area, n: number | '') => (n === '' ? '' : area === 'torpum' ? `Torpum ${n}` : `SB-${n}`);
+/** «SB-4 · Mørvikveien»: nummer og vei, uten husnummer (betegnelsen ser alle hytteeiere) */
 const autoLabel = (area: Area, n: number | '', address: string) => {
   const base = labelFor(area, n);
   const street = streetOf(address).trim();
@@ -76,7 +76,8 @@ export function AdminPage() {
       {tab !== 'oppsett' && err && <div className="empty">{err} <button className="linkbtn2" onClick={() => void load()}>Prøv igjen</button></div>}
       {tab !== 'oppsett' && !err && cabins === null && <div className="empty">Henter registeret …</div>}
       {!err && cabins !== null && tab === 'hytter' && <CabinsTab cabins={cabins} people={people} notes={notes} reload={load} onArchive={(id) => { setArchiveCabin(id); setTab('arkiv'); }} />}
-      {!err && cabins !== null && tab === 'arkiv' && <ArchiveTab cabins={cabins} initialCabin={archiveCabin} onChanged={() => {}} />}
+      {!err && cabins !== null && tab === 'arkiv' && <ArchiveTab cabins={cabins} initialCabin={archiveCabin} onChanged={() => {}}
+        owners={Object.fromEntries(cabins.map((c) => [c.id, people.filter((p) => p.cabin_ids.includes(c.id)).map((p) => p.full_name)]))} />}
       {!err && cabins !== null && tab === 'personer' && <PeopleTab cabins={cabins} people={people} reload={load} />}
     </>
   );

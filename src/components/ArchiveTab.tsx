@@ -6,14 +6,14 @@ import { Icon } from './Icon';
 
 export const ARCHIVE_CATEGORIES = ['Festekontrakt', 'Skjøte', 'Kart og tomtegrense', 'Avtale', 'Byggetillatelse', 'Annet'];
 
-interface CabinLite { id: string; label: string; number: number; area: 'morvika' | 'torpum' }
+interface CabinLite { id: string; label: string; number: number; area: 'morvika' | 'torpum'; address: string | null; gnr: number | null; bnr: number | null; fnr: number | null }
 interface Arch { id: string; cabin_id: string; title: string; category: string; document_date: string | null; storage_path: string; created_at: string }
 
 const safeName = (n: string) => n.normalize('NFKD').replace(/[^\w.-]+/g, '_').replace(/_+/g, '_').slice(-80);
 const ext = (n: string) => (n.split('.').pop() || '').toUpperCase().slice(0, 4);
 
 /** Administrasjon → Hyttearkiv: grunneier legger inn festekontrakt o.l. per hytte. Eierne ser dem i Min hytte. */
-export function ArchiveTab({ cabins, initialCabin, onChanged }: { cabins: CabinLite[]; initialCabin: string | null; onChanged: () => void }) {
+export function ArchiveTab({ cabins, owners, initialCabin, onChanged }: { cabins: CabinLite[]; owners: Record<string, string[]>; initialCabin: string | null; onChanged: () => void }) {
   const toast = useToast();
   const [cabinId, setCabinId] = useState<string | null>(initialCabin);
   const [q, setQ] = useState('');
@@ -38,8 +38,9 @@ export function ArchiveTab({ cabins, initialCabin, onChanged }: { cabins: CabinL
 
   const list = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return cabins.filter((c) => !s || c.label.toLowerCase().includes(s) || String(c.number) === s);
-  }, [cabins, q]);
+    return cabins.filter((c) => !s || c.label.toLowerCase().includes(s) || String(c.number) === s
+      || (c.address ?? '').toLowerCase().includes(s) || (owners[c.id] ?? []).some((n) => n.toLowerCase().includes(s)));
+  }, [cabins, owners, q]);
   const cabin = cabins.find((c) => c.id === cabinId);
   const without = cabins.filter((c) => !counts[c.id]).length;
 
@@ -60,29 +61,39 @@ export function ArchiveTab({ cabins, initialCabin, onChanged }: { cabins: CabinL
 
   return (
     <div className="archive">
-      <div className="card archive-list">
+      <div className="card ledgerbox">
         <div className="archive-h">
-          <input type="search" placeholder="Søk på hytte" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Søk på hytte" />
-          <small className="muted">{without} {without === 1 ? 'hytte' : 'hytter'} uten dokumenter i arkivet</small>
+          <input type="search" placeholder="Søk på navn, adresse eller nummer" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Søk etter hytte" />
+          <small className="muted">{list.length} av {cabins.length} hytter · {without} uten dokumenter i arkivet</small>
         </div>
-        <div className="scrollbox archive-scroll">
-          {list.map((c) => (
-            <button key={c.id} className={`archive-cabin ${c.id === cabinId ? 'on' : ''}`} onClick={() => setCabinId(c.id)}>
-              <span>{c.label}{c.area === 'torpum' && <small className="muted"> · Torpum</small>}</span>
-              {counts[c.id] ? <span className="pill">{counts[c.id]}</span> : <span className="muted" style={{ fontSize: 12 }}>tomt</span>}
-            </button>
-          ))}
-          {!list.length && <p className="muted" style={{ padding: 12 }}>Ingen hytter passer.</p>}
+        <div className="tbl-wrap scrollbox archive-scroll">
+          <table className="picktable">
+            <thead><tr><th>Hytte</th><th>Eier</th><th>Hytteadresse</th><th>Gnr/Bnr/Fnr</th><th className="r">Arkiv</th></tr></thead>
+            <tbody>
+              {list.map((c) => (
+                <tr key={c.id} className={c.id === cabinId ? 'on' : ''} onClick={() => setCabinId(c.id)} tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCabinId(c.id); } }} aria-selected={c.id === cabinId}>
+                  <td><b>{c.label}</b>{c.area === 'torpum' && <div className="muted" style={{ fontSize: 12 }}>Torpum</div>}</td>
+                  <td>{(owners[c.id] ?? []).join(', ') || <span className="muted">Ingen eier</span>}</td>
+                  <td>{c.address || <span className="muted">–</span>}</td>
+                  <td className="num">{[c.gnr, c.bnr, c.fnr].map((x) => x ?? '–').join(' / ')}</td>
+                  <td className="r">{counts[c.id] ? <span className="pill">{counts[c.id]}</span> : <span className="muted" style={{ fontSize: 12 }}>tomt</span>}</td>
+                </tr>
+              ))}
+              {!list.length && <tr><td colSpan={5} className="muted">Ingen hytter passer.</td></tr>}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <div className="archive-main">
-        {!cabin ? (
-          <div className="empty">Velg en hytte til venstre. Dokumentene du legger inn her, ser hyttas eiere under <b>Min hytte → Dokumentregister → «Fra grunneier»</b>. De kan lese dem, men ikke endre eller slette. Arkivet følger hytta ved eierskifte.</div>
-        ) : (
-          <>
-            <h2 className="serif h2" style={{ margin: '0 0 12px' }}>{cabin.label}</h2>
-            <ArchiveUpload cabinId={cabin.id} onDone={async () => { await Promise.all([loadDocs(), loadCounts()]); onChanged(); }} />
+      {!cabin ? (
+        <div className="empty">Velg en hytte i tabellen. Dokumentene du legger inn her, ser hyttas eiere under <b>Min hytte → Dokumentregister → «Fra grunneier»</b>. De kan lese dem, men ikke endre eller slette. Arkivet følger hytta ved eierskifte.</div>
+      ) : (
+        <div className="archive-main">
+          <h2 className="serif h2" style={{ margin: '0 0 4px' }}>{cabin.label}</h2>
+          <p className="muted" style={{ margin: '0 0 12px' }}>{[(owners[cabin.id] ?? []).join(', '), cabin.address].filter(Boolean).join(' · ') || 'Ingen eier registrert'}</p>
+          <div className="archive-cols">
+            <ArchiveUpload cabinId={cabin.id} label={cabin.label} onDone={async () => { await Promise.all([loadDocs(), loadCounts()]); onChanged(); }} />
             <div className="card doclist">
               <div className="doclist-h"><b>Hyttearkiv</b><span className="muted">{docs?.length ?? 0} dokumenter</span></div>
               {docs?.map((d) => (
@@ -100,14 +111,14 @@ export function ArchiveTab({ cabins, initialCabin, onChanged }: { cabins: CabinL
               ))}
               {docs && !docs.length && <div className="empty" style={{ border: 0, margin: 8 }}>Ingen dokumenter i arkivet for denne hytta ennå.</div>}
             </div>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function ArchiveUpload({ cabinId, onDone }: { cabinId: string; onDone: () => Promise<void> }) {
+function ArchiveUpload({ cabinId, label, onDone }: { cabinId: string; label: string; onDone: () => Promise<void> }) {
   const toast = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
@@ -135,7 +146,7 @@ function ArchiveUpload({ cabinId, onDone }: { cabinId: string; onDone: () => Pro
   }
 
   return (
-    <form className="card form" onSubmit={submit} style={{ marginBottom: 14 }}>
+    <form className="card form" onSubmit={submit}>
       <label className="field full" htmlFor="ar-file">Fil (PDF, bilde eller Word)
         <input key={key} id="ar-file" type="file" required accept=".pdf,.doc,.docx,.odt,image/*" onChange={(e) => {
           const f = e.target.files?.[0] ?? null; setFile(f);
@@ -143,7 +154,7 @@ function ArchiveUpload({ cabinId, onDone }: { cabinId: string; onDone: () => Pro
         }} />
       </label>
       <label className="field full" htmlFor="ar-title">Tittel
-        <input id="ar-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="F.eks. Festekontrakt Hytte 4" />
+        <input id="ar-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`F.eks. Festekontrakt ${label.split(' · ')[0]}`} />
       </label>
       <label className="field" htmlFor="ar-cat">Type
         <select id="ar-cat" value={category} onChange={(e) => setCategory(e.target.value)}>{ARCHIVE_CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select>
