@@ -30,6 +30,7 @@ export function InfoPage() {
   const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [docs, setDocs] = useState<Doc[] | null>(null);
   const [adding, setAdding] = useState<Grp | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [upload, setUpload] = useState(false);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
 
@@ -104,64 +105,92 @@ export function InfoPage() {
 
       <section style={{ marginTop: 28 }}>
         <h2 className="serif h2" style={{ margin: '0 0 10px' }}>Kontakter</h2>
-        <div className="contacts">
-          {groups.map((g) => {
-            const list = (contacts ?? []).filter((c) => c.grp === g);
-            if (!list.length && !canEdit(g)) return null;
-            return (
-              <div key={g} className="card cgroup">
-                <h3>{GRP_LABEL[g]}</h3>
-                {list.length === 0 && <p className="muted" style={{ margin: 0, fontSize: 14 }}>Ingen kontakter lagt inn.</p>}
-                {list.map((c) => (
-                  <div key={c.id} className="crow">
-                    <div style={{ minWidth: 0 }}>
-                      {c.title && <small>{c.title}</small>}
-                      <b>{c.name}</b>
-                      {c.note && <small>{c.note}</small>}
-                    </div>
-                    <div className="cacts">
-                      {c.phone && <a className="btn small" href={tel(c.phone)}><Icon name="phone" size={16} />{c.phone}</a>}
-                      {c.email && <a className="btn small ghost" href={`mailto:${c.email}`}><Icon name="mail" size={16} />E-post</a>}
-                      {canEdit(g) && (confirmDel === c.id
-                        ? <button className="btn small danger-btn" onClick={() => void removeContact(c)}>Slett</button>
-                        : <button className="linkbtn" onClick={() => setConfirmDel(c.id)} aria-label={`Slett ${c.name}`}>Slett</button>)}
-                    </div>
-                  </div>
-                ))}
-                {canEdit(g) && (adding === g
-                  ? <ContactForm grp={g} onDone={() => { setAdding(null); void load(); }} onCancel={() => setAdding(null)} />
-                  : <button className="linkbtn2" style={{ marginTop: 8 }} onClick={() => setAdding(g)}>+ Legg til kontakt</button>)}
-              </div>
-            );
-          })}
-        </div>
+        <div className="docgroups">{groups.filter((g) => g !== 'nyttig').map((g) => group(g, false))}</div>
+        {groups.includes('nyttig') && <div style={{ marginTop: 12 }}>{group('nyttig', true)}</div>}
       </section>
     </>
   );
+
+  function group(g: Grp, wide: boolean) {
+    const list = (contacts ?? []).filter((c) => c.grp === g);
+    if (!list.length && !canEdit(g)) return null;
+    return (
+      <div key={g} className={`card cgroup ${wide ? 'wide' : ''}`}>
+        <h3>{GRP_LABEL[g]}</h3>
+        {list.length === 0 && <p className="muted" style={{ margin: 0, fontSize: 14 }}>Ingen kontakter lagt inn.</p>}
+        <div className="crows">
+          {list.map((c) => editingId === c.id ? (
+            <ContactForm key={c.id} grp={g} contact={c} onDone={() => { setEditingId(null); void load(); }} onCancel={() => setEditingId(null)} />
+          ) : (
+            <div key={c.id} className="crow">
+              <div className="cinfo">
+                {c.title && <small>{c.title}</small>}
+                <b>{c.name}</b>
+                {c.note && <small>{c.note}</small>}
+              </div>
+              <div className="cacts">
+                {c.phone && <a className="btn small" href={tel(c.phone)}><Icon name="phone" size={16} />{c.phone}</a>}
+                {c.email && <a className="btn small ghost" href={`mailto:${c.email}`}><Icon name="mail" size={16} />E-post</a>}
+              </div>
+              {canEdit(g) && (
+                <div className="cedit">
+                  {confirmDel === c.id ? (
+                    <span className="confirm">Slette?
+                      <button className="btn small danger-btn" onClick={() => void removeContact(c)}>Slett</button>
+                      <button className="btn small ghost" onClick={() => setConfirmDel(null)}>Avbryt</button></span>
+                  ) : (
+                    <>
+                      <button className="linkbtn2" onClick={() => { setEditingId(c.id); setAdding(null); }} aria-label={`Rediger ${c.name}`}>Rediger</button>
+                      <button className="linkbtn" onClick={() => setConfirmDel(c.id)} aria-label={`Slett ${c.name}`}>Slett</button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        {canEdit(g) && (adding === g
+          ? <ContactForm grp={g} onDone={() => { setAdding(null); void load(); }} onCancel={() => setAdding(null)} />
+          : <button className="linkbtn2" style={{ marginTop: 10 }} onClick={() => { setAdding(g); setEditingId(null); }}>+ Legg til kontakt</button>)}
+      </div>
+    );
+  }
 }
 
-function ContactForm({ grp, onDone, onCancel }: { grp: Grp; onDone: () => void; onCancel: () => void }) {
+function ContactForm({ grp, contact, onDone, onCancel }: { grp: Grp; contact?: Contact; onDone: () => void; onCancel: () => void }) {
   const toast = useToast();
-  const [title, setTitle] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
+  const [title, setTitle] = useState(contact?.title ?? '');
+  const [name, setName] = useState(contact?.name ?? '');
+  const [phone, setPhone] = useState(contact?.phone ?? '');
+  const [email, setEmail] = useState(contact?.email ?? '');
+  const [note, setNote] = useState(contact?.note ?? '');
   const [busy, setBusy] = useState(false);
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const { error } = await supabase.from('contacts').insert({ grp, title: title.trim(), name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, sort: 10 });
+    const row = { title: title.trim(), name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, note: note.trim() };
+    const { error } = contact
+      ? await supabase.from('contacts').update(row).eq('id', contact.id)
+      : await supabase.from('contacts').insert({ grp, ...row, sort: 10 });
     setBusy(false);
     if (error) { toast('Kontakten ble ikke lagret.'); return; }
+    toast(contact ? 'Kontakten er oppdatert.' : 'Kontakten er lagt til.');
     onDone();
   }
   return (
     <form className="cform2" onSubmit={submit}>
-      <input type="text" placeholder={grp === 'nyttig' ? 'Hva (f.eks. Brøyting)' : 'Rolle (f.eks. Leder)'} value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Rolle" />
-      <input type="text" required placeholder="Navn" value={name} onChange={(e) => setName(e.target.value)} aria-label="Navn" />
-      <input type="text" inputMode="tel" placeholder="Telefon" value={phone} onChange={(e) => setPhone(e.target.value)} aria-label="Telefon" />
-      <input type="email" placeholder="E-post (valgfritt)" value={email} onChange={(e) => setEmail(e.target.value)} aria-label="E-post" />
-      <div className="actions"><button type="button" className="btn small ghost" onClick={onCancel}>Avbryt</button><button className="btn small primary" disabled={busy || !name.trim()}>Lagre</button></div>
+      <label className="field" >{grp === 'nyttig' ? 'Hva' : 'Rolle'}
+        <input type="text" placeholder={grp === 'nyttig' ? 'F.eks. Brøyting' : 'F.eks. Leder'} value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+      <label className="field">Navn
+        <input type="text" required value={name} onChange={(e) => setName(e.target.value)} /></label>
+      <label className="field">Telefon
+        <input type="text" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
+      <label className="field">E-post (valgfritt)
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+      <label className="field full">Merknad (valgfritt)
+        <input type="text" placeholder="F.eks. Ring ved behov for strøing" value={note} onChange={(e) => setNote(e.target.value)} /></label>
+      <div className="actions"><button type="button" className="btn small ghost" onClick={onCancel}>Avbryt</button>
+        <button className="btn small primary" disabled={busy || !name.trim()}>{busy ? 'Lagrer …' : contact ? 'Lagre endringer' : 'Lagre'}</button></div>
     </form>
   );
 }
