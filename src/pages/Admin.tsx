@@ -25,6 +25,12 @@ const AREA_LABEL: Record<Area, string> = { morvika: 'Mørvika', torpum: 'Torpum'
 const STATUS_LABEL: Record<PersonStatus, string> = { aktiv: 'Aktivert', venter: 'Ikke logget inn ennå', mangler_epost: 'Mangler e-post' };
 const ALL_ROLES: AppRole[] = ['grunneier', 'styre_vel', 'styre_vei', 'admin'];
 const labelFor = (area: Area, n: number | '') => (n === '' ? '' : area === 'torpum' ? `Torpum ${n}` : `Hytte ${n}`);
+/** «Hytte 4 · Mørvikveien»: nummer og vei, uten husnummer (betegnelsen ser alle hytteeiere) */
+const autoLabel = (area: Area, n: number | '', address: string) => {
+  const base = labelFor(area, n);
+  const street = streetOf(address).trim();
+  return base && street ? `${base} · ${street}` : base;
+};
 const newKey = () => Math.random().toString(36).slice(2);
 const toInt = (v: string) => (v.trim() === '' ? null : Number.parseInt(v, 10));
 const emailOk = (e: string) => e.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
@@ -203,7 +209,9 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
   const [area, setArea] = useState<Area>(startArea);
   const [number, setNumber] = useState<string>(editing ? String(editing.number) : String(nextNumber(startArea)));
   const [label, setLabel] = useState(editing?.label ?? '');
-  const [labelTouched, setLabelTouched] = useState(Boolean(editing));
+  // Betegnelsen følger nummer og adresse til du skriver en egen
+  const [labelTouched, setLabelTouched] = useState(Boolean(editing) && editing!.label !== labelFor(editing!.area, editing!.number)
+    && editing!.label !== autoLabel(editing!.area, editing!.number, editing!.address ?? ''));
   const [address, setAddress] = useState(editing ? (editing.address ?? '') : defaultStreet(startArea));
   const [gnr, setGnr] = useState(editing ? (editing.gnr != null ? String(editing.gnr) : '') : defaultGnr(startArea));
   const [bnr, setBnr] = useState(editing?.bnr != null ? String(editing.bnr) : '');
@@ -219,7 +227,7 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
   const [error, setError] = useState<string | null>(null);
   const numberRef = useRef<HTMLInputElement>(null);
 
-  const shownLabel = labelTouched ? label : labelFor(area, number === '' ? '' : Number(number));
+  const shownLabel = labelTouched ? label : autoLabel(area, number === '' ? '' : Number(number), address);
   const duplicate = !editing && number !== '' && cabins.some((c) => c.area === area && c.number === Number(number));
 
   function pickArea(a: Area) {
@@ -250,7 +258,7 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
 
     setBusy(true);
     const row = {
-      area, number: n, label: shownLabel.trim() || labelFor(area, n), address: address.trim() || null,
+      area, number: n, label: shownLabel.trim() || autoLabel(area, n, address), address: address.trim() || null,
       gnr: toInt(gnr), bnr: toInt(bnr), fnr: tomt === 'selveier' ? null : toInt(fnr),
       tomt: area === 'torpum' ? null : tomt,
       vel_member: area === 'torpum' ? false : vel, vei_member: true,
@@ -330,7 +338,7 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
           <input id="q-number" ref={numberRef} type="number" min={1} inputMode="numeric" required value={number} onChange={(e) => setNumber(e.target.value)} />
         </label>
         <label className="field" htmlFor="q-label">Betegnelse
-          <input id="q-label" type="text" value={shownLabel} onChange={(e) => { setLabel(e.target.value); setLabelTouched(true); }} />
+          <input id="q-label" type="text" value={shownLabel} onChange={(e) => { setLabel(e.target.value); setLabelTouched(e.target.value !== ''); }} />
         </label>
         <label className="field span2" htmlFor="q-address">Hytteadresse
           <input id="q-address" type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="F.eks. Mørvikveien 209"

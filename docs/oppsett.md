@@ -70,8 +70,9 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260927143000_torpum_veilag.sql` | Torpum og tilgangsnivået «Bare Veilaget» | 27. sep 2026 |
 | `20260927153000_grunneier_vel_veilag.sql` | Grunneier har full tilgang til Vel og Veilag | 27. sep 2026 |
 | `20260927160000_eierskifte.sql` | Eierperioder, eierskifte og hyttearkiv | 27. sep 2026 |
-| `20260927170000_registrering.sql` | Hurtigregistrering, ventende personer og aktivering ved første innlogging | |
-| `20260927180000_tomtetype.sql` | Tomtetype på hytta: festetomt eller selveiertomt | |
+| `20260927170000_registrering.sql` | Hurtigregistrering, ventende personer og aktivering ved første innlogging | 27. sep 2026 |
+| `20260927180000_tomtetype.sql` | Tomtetype på hytta: festetomt eller selveiertomt | 27. sep 2026 |
+| `20260927190000_betegnelse.sql` | Veinavn i betegnelsen på hytter som allerede er registrert | |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 
