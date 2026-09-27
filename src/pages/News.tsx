@@ -40,7 +40,7 @@ export function NewsPage() {
 
     // Merk som lest
     if (list.length) {
-      void supabase.from('news_reads').upsert(list.map((n) => ({ news_id: n.id })), { onConflict: 'news_id,user_id', ignoreDuplicates: true });
+      await supabase.from('news_reads').upsert(list.map((n) => ({ news_id: n.id })), { onConflict: 'news_id,user_id', ignoreDuplicates: true });
     }
     // Avsendere ser hvor mange som har lest
     if (canPost) {
@@ -99,7 +99,7 @@ export function NewsPage() {
               {n.body && <p style={{ whiteSpace: 'pre-line' }}>{n.body}</p>}
               <div className="foot">
                 <span>Til: {AUDIENCE_LABEL[n.audience]}</span>
-                {canPost && <span className="num">Lest av {readCounts[n.id] ?? 0}{sizes[n.audience] != null ? ` av ${sizes[n.audience]}` : ''}</span>}
+                {canPost && <span className="num">Lest av {readCounts[n.id] ?? 0}{sizes[n.audience] ? ` av ${sizes[n.audience]} hytteeiere` : ''}</span>}
                 {(mine || me.roles.includes('admin')) && (confirmDel === n.id ? (
                   <span className="confirm">Slette oppslaget?
                     <button className="btn small danger-btn" onClick={() => void remove(n.id)}>Slett</button>
