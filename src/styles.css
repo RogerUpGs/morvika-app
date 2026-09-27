@@ -458,3 +458,43 @@ td.num{white-space:nowrap}
 .field .hint { display: block; font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 4px; line-height: 1.35; }
 .seg.small{margin-top:6px;display:grid;max-width:360px}
 .seg.small button{text-align:center;padding:8px 12px}
+
+/* ---------- Bilder i full størrelse ---------- */
+.lb-img{display:block;max-width:min(100%,1100px);max-height:84vh;max-height:84dvh;margin:0 auto;border-radius:6px;object-fit:contain}
+.lb-x{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:12px;width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:#fff;display:grid;place-items:center;cursor:pointer;z-index:61}
+.lb-x:hover{background:rgba(255,255,255,.26)}
+
+/* ---------- Fase 3: Hyttepraten, Varsler, Meldinger ---------- */
+.navcnt{margin-left:auto;min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:var(--accent);color:var(--surface);font-size:12px;font-weight:800;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+.alertbar.lv-viktig{background:var(--accent);color:var(--surface)}
+.seg.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));max-width:520px;margin-top:6px}
+.seg.three button{text-align:center}
+.seg button.lv-akutt.on{background:var(--danger);color:var(--surface)}
+.seg button.lv-viktig.on{background:var(--accent);color:var(--surface)}
+.danger-fill{background:var(--danger)!important;border-color:var(--danger)!important;color:var(--surface)!important}
+.rcpts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.rcpts h4{margin:0 0 6px;font-size:14px}
+.rcpts ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px;font-size:14px}
+.rcpts > p{grid-column:1/-1}
+.tochoice{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:6px}
+.tobtn{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--line-2);border-radius:10px;cursor:pointer;font-weight:400}
+.tobtn input{position:absolute;opacity:0;pointer-events:none}
+.tobtn b{font-size:15px}
+.tobtn small{font-size:13px;color:var(--muted)}
+.tobtn.on{border-color:var(--primary);background:var(--primary-soft)}
+.tobtn:focus-within{outline:2px solid var(--primary);outline-offset:2px}
+.cform{position:relative}
+.cform input{flex:1;min-width:0}
+.convo-h h3{overflow-wrap:anywhere}
+.bub .bimgs{margin-bottom:6px}
+@media (max-width:900px){
+  .convo{min-height:calc(100dvh - 190px)}
+  .bubbles{padding:12px}
+  .bub{max-width:88%}
+}
+.rcpts li small{display:block;color:var(--muted);font-size:12px;line-height:1.3}
+.ctools{flex-wrap:nowrap}
+.ctools .left{min-width:0;flex-wrap:nowrap}
+.ctools select{min-width:0;max-width:170px}
+.ctools .btn{flex:none}
+@media (max-width:900px){.msg-lede.hide-phone{display:none}}

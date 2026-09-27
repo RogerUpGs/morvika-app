@@ -165,7 +165,7 @@ function NewsForm({ senders, onDone, onCancel }: { senders: Sender[]; onDone: ()
         <textarea id="news-body" value={body} onChange={(e) => setBody(e.target.value)} />
       </label>
       <label className="check full"><input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
-        Varsle mottakerne (push-varsler kobles på i fase 3)</label>
+        Varsle mottakerne (push-varsler kommer i en senere versjon)</label>
       <div className="actions full">
         <button type="button" className="btn ghost" onClick={onCancel}>Avbryt</button>
         <button className="btn primary" disabled={busy || !title.trim()}>{busy ? 'Publiserer …' : 'Publiser'}</button>

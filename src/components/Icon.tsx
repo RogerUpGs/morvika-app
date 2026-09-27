@@ -16,6 +16,11 @@ const PATHS = {
   sun: 'M12 3v2m0 14v2m9-9h-2M5 12H3m15.4-6.4-1.4 1.4M7 17l-1.4 1.4m0-12.8L7 7m10 10 1.4 1.4M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
   moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z',
   mail: 'M4 6h16v12H4zM4 7l8 6 8-6',
+  camera: 'M4 8h3l2-3h6l2 3h3v11H4V8Zm8 9a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
+  thumb: 'M7 11v9H4v-9h3Zm0 0 4-7a2 2 0 0 1 3 2l-1 4h5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 16.8 20H7',
+  x: 'M6 6l12 12M18 6 6 18',
+  check: 'M5 12l5 5 9-10',
+  chev: 'M9 5l7 7-7 7',
 } as const;
 
 export type IconName = keyof typeof PATHS;

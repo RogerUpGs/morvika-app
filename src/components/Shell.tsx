@@ -9,6 +9,10 @@ import { NewsPage } from '../pages/News';
 import { ComingSoon } from '../pages/ComingSoon';
 import { ProfilePage } from '../pages/Profile';
 import { AdminPage } from '../pages/Admin';
+import { ChatPage } from '../pages/Chat';
+import { AlertsPage, LEVEL_LABEL } from '../pages/Alerts';
+import { MessagesPage } from '../pages/Messages';
+import { useBadges } from '../lib/badges';
 
 const TITLES: Record<string, string> = {
   hjem: 'Hjem', minhytte: 'Min hytte', chat: 'Hyttepraten', nyheter: 'Nyheter', varsler: 'Varsler',
@@ -20,10 +24,11 @@ export function Shell() {
   const isPhone = useIsPhone();
   const [light, toggleTheme] = useTheme();
   const items = useNavItems();
-  // Nyheter er den første modulen som er koblet til databasen, så PC-en starter der inntil videre.
-  const [route, go] = useRoute(isPhone ? 'hjem' : 'nyheter');
+  const badges = useBadges();
+  const pcStart = me.veilagOnly ? 'nyheter' : 'chat';
+  const [route, go] = useRoute(isPhone ? 'hjem' : pcStart);
   const known = route === 'hjem' || items.some((i) => i.key === route);
-  const view = known ? route : isPhone ? 'hjem' : 'nyheter';
+  const view = known ? route : isPhone ? 'hjem' : pcStart;
 
   useEffect(() => { document.title = `${TITLES[view] ?? 'Mørvika'} · Mørvika`; }, [view]);
 
@@ -31,19 +36,25 @@ export function Shell() {
   const eyebrow = me.veilagOnly ? 'Mørvikveien Veilag'
     : view === 'hjem' ? 'Mørvika hytteområde' : items.find((i) => i.key === view)?.group ?? 'Fellesskap';
 
+  const count = (k: string) => k === 'varsler' ? badges.openAlerts.length : k === 'meldinger' ? badges.unreadThreads : k === 'chat' ? badges.newPosts : 0;
+  const top = badges.openAlerts.find((a) => a.level === 'akutt') ?? badges.openAlerts[0];
+
   let page: ReactNode;
   switch (view) {
     case 'hjem': page = <Home go={go} />; break;
     case 'nyheter': page = <NewsPage />; break;
     case 'profil': page = <ProfilePage />; break;
     case 'admin': page = <AdminPage />; break;
+    case 'chat': page = <ChatPage />; break;
+    case 'varsler': page = <AlertsPage />; break;
+    case 'meldinger': page = <MessagesPage />; break;
     default: page = <ComingSoon view={view} />;
   }
 
   return (
     <div className="app">
       <aside className="side">
-        <div className="brand"><Logo /><div><b>Mørvika</b><small>Hytteområde · 150 hytter</small></div></div>
+        <div className="brand"><Logo /><div><b>Mørvika</b><small>Hytteområde</small></div></div>
         <nav className="nav" aria-label="Hovedmeny">
           {groups.map((g) => {
             const list = items.filter((i) => i.group === g);
@@ -55,6 +66,7 @@ export function Shell() {
                   <button key={it.key} className={view === it.key ? 'on' : ''} onClick={() => go(it.key)}
                     aria-current={view === it.key ? 'page' : undefined}>
                     <Icon name={it.icon} />{it.label}
+                    {count(it.key) > 0 && <span className="navcnt">{count(it.key)}</span>}
                   </button>
                 ))}
               </div>
@@ -89,7 +101,15 @@ export function Shell() {
             </button>
           </div>
         </header>
-        <div className="wrap">{page}</div>
+        <div className="wrap">
+          {top && view !== 'varsler' && (
+            <button className={`alertbar lv-${top.level}`} onClick={() => go('varsler')}>
+              <b>{LEVEL_LABEL[top.level]}</b><span className="tl">{top.title}</span>
+              <span className="go">{badges.openAlerts.length > 1 ? `${badges.openAlerts.length} varsler` : 'Les'}<Icon name="chev" size={16} /></span>
+            </button>
+          )}
+          {page}
+        </div>
       </main>
     </div>
   );

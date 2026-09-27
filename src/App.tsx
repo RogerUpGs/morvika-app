@@ -3,6 +3,7 @@ import { ToastProvider, useTheme } from './lib/ui';
 import { Login } from './pages/Login';
 import { AskName, NotInvited, Splash } from './pages/Gates';
 import { Shell } from './components/Shell';
+import { BadgesProvider } from './lib/badges';
 
 function Gate() {
   useTheme();
@@ -11,7 +12,7 @@ function Gate() {
   if (!me.session) return <Login />;
   if (!me.isResident) return <NotInvited />;
   if (!me.profile?.full_name) return <AskName />;
-  return <Shell />;
+  return <BadgesProvider><Shell /></BadgesProvider>;
 }
 
 export default function App() {

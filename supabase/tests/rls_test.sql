@@ -84,6 +84,8 @@ select pg_temp.denied('Kari kan ikke publisere som grunneier',
 insert into public.news_reads (news_id) select id from public.news;
 insert into public.alert_acks (alert_id) select id from public.alerts;
 select pg_temp.check('Kari ser og bekrefter begge varslene', (select count(*) from public.alert_acks) = 2);
+select pg_temp.denied('Kari ser ikke mottakerlisten for et varsel',
+  $$select * from public.alert_recipients((select id from public.alerts where title = 'Vannlekkasje'))$$);
 insert into public.cabin_ledger (cabin_id, description, amount) values ('10000000-0000-0000-0000-000000000047', 'Festeavgift', 8400);
 insert into public.cabin_documents (cabin_id, name, folder, storage_path)
   values ('10000000-0000-0000-0000-000000000047', 'Forsikring.pdf', 'Forsikring', public.my_ownership('10000000-0000-0000-0000-000000000047') || '/forsikring.pdf'),
@@ -146,6 +148,11 @@ select pg_temp.check('Veilagets styre ser bildet i samtalen', (select count(*) f
 select pg_temp.check('Veilagets styre ser ikke samtaler til grunneier', (select count(*) from public.threads where recipient = 'grunneier') = 0);
 select pg_temp.check('Veilagets styre ser at Per har bekreftet varselet', (select count(*) from public.alert_acks) = 2);
 select pg_temp.check('Veilagets styre ser påmeldingen', (select count(*) from public.event_attendees) = 1);
+select pg_temp.check('Veilagets styre ser hvem som har bekreftet varselet (Torpum med, avsender ikke)',
+  (select string_agg(full_name || ':' || status, ',' order by full_name) from public.alert_recipients((select id from public.alerts where title = 'Veien stengt fredag')))
+  = 'Kari Nilsen:bekreftet,Per Strand:bekreftet,Siri Nilsen:venter,Trond Aas:venter');
+select pg_temp.denied('Veilagets styre ser ikke mottakerlisten for grunneiers varsel',
+  $$select * from public.alert_recipients((select id from public.alerts where title = 'Vannlekkasje'))$$);
 
 -- ---------------------------------------------------------------------
 -- Roger igjen: grunneier ser samtalen til grunneier, men ikke Min hytte

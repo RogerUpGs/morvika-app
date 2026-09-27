@@ -4,11 +4,14 @@ import { supabase } from '../lib/supabase';
 import { dShort, firstName, greeting } from '../lib/format';
 import { Icon } from '../components/Icon';
 import { useNavItems } from '../lib/nav';
+import { useBadges } from '../lib/badges';
 
 /** Telefonens startside: store knapper, to i bredden. */
 export function Home({ go }: { go: (r: string) => void }) {
   const me = useMe();
   const items = useNavItems().filter((i) => i.key !== 'profil');
+  const badges = useBadges();
+  const akutt = badges.openAlerts.some((a) => a.level === 'akutt');
   const [lastNews, setLastNews] = useState<string | null>(null);
   const [unreadNews, setUnreadNews] = useState(0);
 
@@ -29,14 +32,15 @@ export function Home({ go }: { go: (r: string) => void }) {
 
   const sub: Record<string, string> = {
     minhytte: me.cabins[0]?.label ?? '',
-    chat: 'Del bilder og nytt',
+    chat: badges.newPosts ? `${badges.newPosts} ${badges.newPosts === 1 ? 'nytt innlegg' : 'nye innlegg'}` : 'Del bilder og nytt',
     nyheter: unreadNews ? `${unreadNews} ${unreadNews === 1 ? 'ny' : 'nye'}` : lastNews ? `Siste ${dShort(lastNews)}` : me.veilagOnly ? 'Fra Veilaget' : 'Fra styret og grunneier',
-    varsler: 'Viktige beskjeder',
-    meldinger: me.veilagOnly ? 'Til Veilagets styre' : 'Til grunneier og styret',
+    varsler: badges.openAlerts.length ? `${badges.openAlerts.length} venter på deg` : 'Ingen nye',
+    meldinger: badges.unreadThreads ? `${badges.unreadThreads} ${badges.unreadThreads === 1 ? 'ny' : 'nye'}` : me.veilagOnly ? 'Til Veilagets styre' : 'Til grunneier og styret',
     arr: 'Dugnad og treff',
     info: 'Dokumenter og kontakter',
     admin: 'Hytter og eiere',
   };
+  const cnt = (k: string) => k === 'nyheter' ? unreadNews : k === 'varsler' ? badges.openAlerts.length : k === 'meldinger' ? badges.unreadThreads : k === 'chat' ? badges.newPosts : 0;
   const order = ['chat', 'nyheter', 'varsler', 'meldinger', 'minhytte', 'arr', 'info', 'admin'];
   const tiles = order.map((k) => items.find((i) => i.key === k)).filter((x): x is NonNullable<typeof x> => Boolean(x));
   const place = me.cabins[0]?.area === 'torpum' ? 'Torpum' : 'Mørvika hytteområde';
@@ -49,10 +53,11 @@ export function Home({ go }: { go: (r: string) => void }) {
       </div>
       <div className="tiles">
         {tiles.map((it) => (
-          <button key={it.key} className={`tile2 t-${it.key}`} onClick={() => go(it.key)}>
+          <button key={it.key} className={`tile2 t-${it.key} ${it.key === 'varsler' && akutt ? 'akutt' : ''}`} onClick={() => go(it.key)}>
             <Icon name={it.icon} size={38} />
-            <span><b>{it.key === 'info' ? 'Info' : it.label}</b><small>{sub[it.key]}</small></span>
-            {it.key === 'nyheter' && unreadNews > 0 && <span className="cnt">{unreadNews}</span>}
+            <span><b>{it.key === 'info' ? 'Info' : it.label}</b>
+              {it.key === 'varsler' && akutt ? <span className="flag">Akutt varsel</span> : <small>{sub[it.key]}</small>}</span>
+            {cnt(it.key) > 0 && <span className="cnt">{cnt(it.key)}</span>}
           </button>
         ))}
       </div>
