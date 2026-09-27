@@ -372,6 +372,40 @@ select pg_temp.check('Torpum ser ikke bilder fra grunneiers nyhet',
   not exists (select 1 from storage.objects where bucket_id = 'nyheter'));
 
 -- ---------------------------------------------------------------------
+-- Arrangementer og Info
+-- ---------------------------------------------------------------------
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+insert into public.events (id, title, starts_at, place, organizer, audience, notify)
+  values ('30000000-0000-0000-0000-000000000001', 'Dugnad på badeplassen', now() + interval '1 day', 'Badeplassen', 'vel', 'alle', true);
+insert into public.contacts (grp, title, name, phone) values ('grunneier', 'Grunneier', 'Roger Mørk', '900 00 000');
+insert into storage.objects (bucket_id, name) values ('dokumenter', 'vel/vedtekter.pdf');
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+insert into public.event_attendees (event_id, persons) values ('30000000-0000-0000-0000-000000000001', 3);
+update public.event_attendees set persons = 4 where event_id = '30000000-0000-0000-0000-000000000001';
+select pg_temp.check('hytteeier melder på og endrer antall', (select persons from public.event_attendees where event_id = '30000000-0000-0000-0000-000000000001') = 4);
+select pg_temp.check('hytteeier ser kontakter', (select count(*) from public.contacts) = 5);
+select pg_temp.denied('hytteeier kan ikke endre kontakter', $$insert into public.contacts (grp, name) values ('nyttig', 'Falsk')$$);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.denied('Vel-styret kan ikke legge filer i grunneiers mappe',
+  $$insert into storage.objects (bucket_id, name) values ('dokumenter', 'grunneier/falsk.pdf')$$);
+insert into storage.objects (bucket_id, name) values ('dokumenter', 'vel/referat.pdf');
+insert into public.contacts (grp, title, name) values ('vel', 'Leder', 'Trond Aas');
+select pg_temp.denied('Vel-styret kan ikke endre grunneiers kontakter', $$insert into public.contacts (grp, name) values ('grunneier', 'Falsk')$$);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000006';
+select pg_temp.check('Torpum ser bare Veilagets og nyttige kontakter', (select count(*) from public.contacts) = 4
+  and not exists (select 1 from public.contacts where grp in ('grunneier', 'vel')));
+reset role;
+set role service_role;
+select pg_temp.check('nytt arrangement med varsel går til mottakerne',
+  exists (select 1 from public.push_targets('events', '30000000-0000-0000-0000-000000000001') t where t.user_id = '00000000-0000-0000-0000-000000000101'));
+select pg_temp.check('påminnelse går bare til de påmeldte',
+  (select array_agg(t.user_id) from public.push_targets('event_reminder', '30000000-0000-0000-0000-000000000001') t)
+  = array['00000000-0000-0000-0000-000000000101'::uuid]);
+reset role;
+select pg_temp.check('påminnelsesjobben sender signal for arrangement i morgen', public.send_event_reminders() = 1);
+set role authenticated;
+
+-- ---------------------------------------------------------------------
 -- Push-varsler
 -- ---------------------------------------------------------------------
 reset role;

@@ -14,7 +14,6 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 webpush.setVapidDetails('mailto:noreply@morvika.no', Deno.env.get('VAPID_PUBLIC_KEY')!, Deno.env.get('VAPID_PRIVATE_KEY')!);
 
-const TABLES = new Set(['alerts', 'news', 'messages', 'post_comments']);
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
 
 interface Target { user_id: string; title: string; body: string; url: string; tag: string; urgent: boolean }
@@ -22,7 +21,8 @@ interface Target { user_id: string; title: string; body: string; url: string; ta
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ ok: true });
   const { table, id } = await req.json().catch(() => ({} as Record<string, string>));
-  if (!TABLES.has(table) || !/^[0-9a-f-]{36}$/i.test(id ?? '')) return json({ error: 'ugyldig' }, 400);
+  // Databasen (push_targets) avgjør hva som skal sendes; ukjente tabeller gir ingen mottakere
+  if (!/^[a-z_]{1,40}$/.test(table ?? '') || !/^[0-9a-f-]{36}$/i.test(id ?? '')) return json({ error: 'ugyldig' }, 400);
 
   const { data: targets, error } = await supa.rpc('push_targets', { p_table: table, p_id: id });
   if (error) return json({ error: error.message }, 500);

@@ -13,12 +13,14 @@ import { ChatPage } from '../pages/Chat';
 import { AlertsPage, LEVEL_LABEL } from '../pages/Alerts';
 import { MessagesPage } from '../pages/Messages';
 import { QuickPostPage } from '../pages/QuickPost';
+import { EventsPage } from '../pages/Events';
+import { InfoPage } from '../pages/Info';
 import { sendersFor } from '../lib/types';
 import { useBadges } from '../lib/badges';
 
 const TITLES: Record<string, string> = {
   hjem: 'Hjem', minhytte: 'Min hytte', chat: 'Hyttepraten', nyheter: 'Nyheter', varsler: 'Varsler',
-  meldinger: 'Meldinger', del: 'Del fra feltet', arr: 'Arrangementer og dugnad', info: 'Info og dokumenter', admin: 'Administrasjon', profil: 'Min profil',
+  meldinger: 'Meldinger', del: 'Del fra feltet', arr: 'Arrangementer', info: 'Info', admin: 'Administrasjon', profil: 'Min profil',
 };
 
 export function Shell() {
@@ -52,6 +54,8 @@ export function Shell() {
     case 'varsler': page = <AlertsPage />; break;
     case 'meldinger': page = <MessagesPage />; break;
     case 'del': page = <QuickPostPage go={go} />; break;
+    case 'arr': page = <EventsPage />; break;
+    case 'info': page = <InfoPage />; break;
     default: page = <ComingSoon view={view} />;
   }
 

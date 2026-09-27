@@ -36,17 +36,17 @@ export function PushPrompt() {
   );
 }
 
-interface Prefs { news: boolean; messages: boolean; praten: boolean }
+interface Prefs { news: boolean; messages: boolean; praten: boolean; events: boolean }
 
 /** Full innstilling på Min profil */
 export function PushSettings() {
   const me = useMe();
   const toast = useToast();
   const { state, busy, enable, disable } = usePush();
-  const [prefs, setPrefs] = useState<Prefs>({ news: true, messages: true, praten: true });
+  const [prefs, setPrefs] = useState<Prefs>({ news: true, messages: true, praten: true, events: true });
 
   useEffect(() => {
-    void supabase.from('notification_prefs').select('news,messages,praten').maybeSingle().then(({ data }) => { if (data) setPrefs(data as Prefs); });
+    void supabase.from('notification_prefs').select('news,messages,praten,events').maybeSingle().then(({ data }) => { if (data) setPrefs(data as Prefs); });
   }, []);
 
   async function setPref(k: keyof Prefs, v: boolean) {
@@ -71,6 +71,7 @@ export function PushSettings() {
   const rows: [keyof Prefs, string, string][] = [
     ['messages', 'Meldinger', 'Svar fra grunneier og styrene, og nye meldinger til deg'],
     ['news', 'Nyheter', 'Nye oppslag fra grunneier, Velet og Veilaget'],
+    ['events', 'Arrangementer', 'Nye arrangementer. Påminnelse dagen før får du alltid når du er påmeldt'],
     ['praten', 'Hyttepraten', 'Når noen kommenterer innlegget ditt'],
   ];
 

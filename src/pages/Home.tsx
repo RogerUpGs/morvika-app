@@ -7,6 +7,7 @@ import { useNavItems } from '../lib/nav';
 import { useBadges } from '../lib/badges';
 import { PushPrompt } from '../components/PushCard';
 import { sendersFor } from '../lib/types';
+import { nextEvent } from './Events';
 
 /** Telefonens startside: store knapper, to i bredden. */
 export function Home({ go }: { go: (r: string) => void }) {
@@ -14,6 +15,8 @@ export function Home({ go }: { go: (r: string) => void }) {
   const items = useNavItems().filter((i) => i.key !== 'profil');
   const badges = useBadges();
   const akutt = badges.openAlerts.some((a) => a.level === 'akutt');
+  const [nextArr, setNextArr] = useState<string | null>(null);
+  useEffect(() => { void nextEvent().then((e) => setNextArr(e ? e.starts_at : null)).catch(() => {}); }, []);
   const [lastNews, setLastNews] = useState<string | null>(null);
   const [unreadNews, setUnreadNews] = useState(0);
 
@@ -38,7 +41,7 @@ export function Home({ go }: { go: (r: string) => void }) {
     nyheter: unreadNews ? `${unreadNews} ${unreadNews === 1 ? 'ny' : 'nye'}` : lastNews ? `Siste ${dShort(lastNews)}` : me.veilagOnly ? 'Fra Veilaget' : 'Fra styret og grunneier',
     varsler: badges.openAlerts.length ? `${badges.openAlerts.length} venter på deg` : 'Ingen nye',
     meldinger: badges.unreadThreads ? `${badges.unreadThreads} ${badges.unreadThreads === 1 ? 'ny' : 'nye'}` : me.veilagOnly ? 'Til Veilagets styre' : 'Til grunneier og styret',
-    arr: 'Dugnad og treff',
+    arr: nextArr ? `Neste ${dShort(nextArr)}` : 'Dugnad og treff',
     info: 'Dokumenter og kontakter',
     admin: 'Hytter og eiere',
   };
