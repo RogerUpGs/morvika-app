@@ -612,3 +612,5 @@ tr.editing td{background:var(--primary-soft)}
 .scrollbox{max-height:min(62vh,560px);overflow:auto;overscroll-behavior:contain;padding:0 8px 6px}
 .scrollbox thead th{position:sticky;top:0;z-index:1;background:var(--surface);box-shadow:0 1px 0 var(--line)}
 @media (max-width:900px){.scrollbox{max-height:65vh}}
+.ledgerbox .scrollbox{padding-top:0}
+.scrollbox thead th{padding-top:12px}

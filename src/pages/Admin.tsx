@@ -147,8 +147,8 @@ function CabinsTab({ cabins, people, notes, reload }: { cabins: AdminCabin[]; pe
       {cabins.length === 0 ? (
         <div className="empty">Ingen hytter registrert ennå. Bruk hurtigregistreringen over.</div>
       ) : (
-        <div className="card" style={{ padding: '6px 8px' }}>
-          <div className="tbl-wrap">
+        <div className="card ledgerbox">
+          <div className="tbl-wrap scrollbox">
             <table>
               <thead><tr><th>Hytte</th><th>Eiendom</th><th>Hytteadresse</th><th>Tomt</th><th>Gnr/Bnr/Fnr</th><th>Eiere</th><th>Vel</th><th /></tr></thead>
               <tbody>
@@ -460,8 +460,8 @@ function PeopleTab({ cabins, people, reload }: { cabins: AdminCabin[]; people: P
           ))}
         </div>
       </div>
-      <div className="card" style={{ padding: '6px 8px' }}>
-        <div className="tbl-wrap">
+      <div className="card ledgerbox">
+        <div className="tbl-wrap scrollbox">
           <table>
             <thead><tr><th>Navn</th><th>E-post</th><th>Mobil</th><th>Hytter</th><th>Roller</th><th>Status</th><th>Sist inne</th></tr></thead>
             <tbody>
