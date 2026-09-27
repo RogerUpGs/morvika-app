@@ -19,7 +19,7 @@ Bare inviterte skal kunne logge inn.
 
 ## 3. E-posten med innloggingskoden (satt opp 27. sep 2026)
 
-E-post sendes via **Resend** fra `noreply@morvika.no` (domenet godkjent med DKIM `resend._domainkey` og CNAME `send`/`rsend` i Cloudflare, «DNS only»). Supabase: Authentication → Emails → SMTP Settings: `smtp.resend.com`, port 465, brukernavn `resend`, passord = API-nøkkel fra Resend. Malene «Magic link» og «Confirm signup» viser koden (`{{ .Token }}`) i emnet og i teksten.
+E-post sendes via **Resend** fra `noreply@morvika.no` (domenet godkjent med DKIM `resend._domainkey` og CNAME `send`/`rsend` i Cloudflare, «DNS only»). Supabase: Authentication → Emails → SMTP Settings: `smtp.resend.com`, port 465, brukernavn `resend`, passord = API-nøkkel fra Resend. Malene «Magic link» og «Confirm signup» viser koden (`{{ .Token }}`) i emnet og i teksten. Malene har **ingen lenke**: Microsoft 365/Outlook «klikker» lenker i e-post automatisk og bruker da opp koden.
 
 ### Opprinnelig notat
 

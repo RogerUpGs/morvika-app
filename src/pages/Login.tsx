@@ -61,7 +61,7 @@ export function Login() {
           </>
         ) : (
           <>
-            <div><h1>Sjekk e-posten din</h1><p>Vi har sendt en kode til <b>{email}</b>. Skriv den inn under, eller trykk på lenken i e-posten. Det kan ta et minutt før den kommer fram. Sjekk også søppelpost.</p></div>
+            <div><h1>Sjekk e-posten din</h1><p>Vi har sendt en kode til <b>{email}</b>. Skriv den inn under. Det kan ta et minutt før den kommer fram. Sjekk også søppelpost. Ber du om en ny kode, gjelder bare den nyeste.</p></div>
             <form onSubmit={verify}>
               <label className="field" htmlFor="login-code">Kode
                 <input id="login-code" className="codeinput" inputMode="numeric" autoComplete="one-time-code"
