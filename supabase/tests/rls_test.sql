@@ -328,6 +328,29 @@ select pg_temp.check('administrator kan endre navn og mobil',
   (select full_name || '|' || phone from public.admin_people() where id = '00000000-0000-0000-0000-000000000201') = 'Anne M. Hansen|900 11 333');
 
 -- ---------------------------------------------------------------------
+-- Grunneier og styrene starter samtale med en hytteeier
+-- ---------------------------------------------------------------------
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+insert into public.threads (id, owner_id, recipient, subject) values ('20000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-000000000101', 'grunneier', 'Gjerde mot veien');
+insert into public.messages (thread_id, body) values ('20000000-0000-0000-0000-000000000101', 'Kan dere flytte gjerdet 1 meter?');
+select pg_temp.denied('grunneier kan ikke starte samtale fra Velet med Torpum-eier',
+  $$insert into public.threads (owner_id, recipient, subject) values ('00000000-0000-0000-0000-000000000006', 'vel', 'Hei')$$);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000088';
+insert into public.threads (owner_id, recipient, subject) values ('00000000-0000-0000-0000-000000000006', 'vei', 'Brøyting i Torpum');
+select pg_temp.denied('Veilagets styre kan ikke starte samtale som grunneier',
+  $$insert into public.threads (owner_id, recipient, subject) values ('00000000-0000-0000-0000-000000000101', 'grunneier', 'Falsk')$$);
+select pg_temp.denied('styret kan ikke starte samtale med en som ikke eier hytte',
+  $$insert into public.threads (owner_id, recipient, subject) values ('00000000-0000-0000-0000-000000000999', 'vei', 'Hei')$$);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+select pg_temp.check('hytteeieren ser samtalen grunneier startet', exists (select 1 from public.threads where subject = 'Gjerde mot veien')
+  and exists (select 1 from public.messages where body = 'Kan dere flytte gjerdet 1 meter?'));
+insert into public.messages (thread_id, body) values ('20000000-0000-0000-0000-000000000101', 'Ja, det går fint.');
+select pg_temp.denied('hytteeier kan ikke starte samtale på vegne av en annen',
+  $$insert into public.threads (owner_id, recipient, subject) values ('00000000-0000-0000-0000-000000000047', 'grunneier', 'Falsk')$$);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000006';
+select pg_temp.check('Torpum-eier ser meldingen fra Veilaget', exists (select 1 from public.threads where subject = 'Brøyting i Torpum'));
+
+-- ---------------------------------------------------------------------
 -- Push-varsler
 -- ---------------------------------------------------------------------
 reset role;
@@ -341,6 +364,9 @@ select pg_temp.check('akutt varsel fra Veilaget går til Veilagets medlemmer, ik
   like '%Per Strand%' and not exists (select 1 from public.push_targets('alerts', gen_random_uuid())));
 select pg_temp.check('samme varsel sendes bare én gang',
   not exists (select 1 from public.push_targets('alerts', (select id from public.alerts where title = 'Veien stengt fredag'))));
+select pg_temp.check('melding fra grunneier i ny samtale går til hytteeieren',
+  (select array_agg(t.user_id) from public.push_targets('messages', (select id from public.messages where body = 'Kan dere flytte gjerdet 1 meter?')) t)
+  = array['00000000-0000-0000-0000-000000000101'::uuid]);
 select pg_temp.check('melding fra hytteeier til grunneier går til grunneier',
   (select array_agg(t.user_id) from public.push_targets('messages', (select id from public.messages where body = 'Kan jeg felle to furuer?')) t)
   = array['00000000-0000-0000-0000-000000000001'::uuid]);

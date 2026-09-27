@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { useMe } from '../lib/session';
 import { useToast } from '../lib/ui';
@@ -18,7 +18,7 @@ const RECIPIENT_HELP: Record<Recipient, string> = {
   vei: 'Vei, brøyting, grøfter og bommer',
 };
 
-interface Thread { id: string; owner_id: string; recipient: Recipient; subject: string; created_at: string; last_message_at: string }
+interface Thread { id: string; owner_id: string; started_by: string | null; recipient: Recipient; subject: string; created_at: string; last_message_at: string }
 interface Message { id: string; thread_id: string; author_id: string; body: string; images: string[]; created_at: string }
 
 const tm = (d: string) => new Date(d).toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
@@ -56,7 +56,7 @@ export function MessagesPage() {
   const dir = useDirectory();
   const uid = me.session?.user.id ?? '';
   const mine = handles(me.roles);
-  const canStart = me.isResident || me.veilagOnly;
+  const canStart = me.isResident || me.veilagOnly || mine.length > 0;
   const choices: Recipient[] = me.veilagOnly ? ['vei'] : ['grunneier', 'vel', 'vei'];
 
   const [threads, setThreads] = useState<Thread[] | null>(null);
@@ -69,7 +69,7 @@ export function MessagesPage() {
 
   const load = useCallback(async () => {
     const [t, r] = await Promise.all([
-      supabase.from('threads').select('id,owner_id,recipient,subject,created_at,last_message_at').order('last_message_at', { ascending: false }).limit(200),
+      supabase.from('threads').select('id,owner_id,started_by,recipient,subject,created_at,last_message_at').order('last_message_at', { ascending: false }).limit(200),
       supabase.from('thread_reads').select('thread_id,read_at').eq('user_id', uid),
     ]);
     if (t.error) { setErr('Meldingene kunne ikke hentes. Sjekk nettet og prøv igjen.'); return; }
@@ -100,10 +100,10 @@ export function MessagesPage() {
     ? RECIPIENT_LABEL[t.recipient]
     : `${nameOf(dir, t.owner_id)}${placeOf(dir.get(t.owner_id)) ? ` · ${placeOf(dir.get(t.owner_id))}` : ''}`;
 
-  const shown = (threads ?? []).filter((t) => filter === 'alle' || (filter === 'mine' ? t.owner_id === uid : t.recipient === filter && t.owner_id !== uid));
+  const shown = (threads ?? []).filter((t) => filter === 'alle' || (filter === 'mine' ? t.owner_id === uid || t.started_by === uid : t.recipient === filter && t.owner_id !== uid));
   const open = (threads ?? []).find((t) => t.id === openId) ?? null;
   const filters: ['alle' | 'mine' | Recipient, string][] = mine.length
-    ? [['alle', 'Alle'], ...mine.map((r) => [r, r === 'grunneier' ? 'Til grunneier' : r === 'vel' ? 'Til Velet' : 'Til Veilaget'] as [Recipient, string]), ['mine', 'Sendt av meg']]
+    ? [['alle', 'Alle'], ...mine.map((r) => [r, r === 'grunneier' ? 'Til grunneier' : r === 'vel' ? 'Til Velet' : 'Til Veilaget'] as [Recipient, string]), ['mine', 'Startet av meg']]
     : [];
 
   function markRead(id: string) {
@@ -117,7 +117,7 @@ export function MessagesPage() {
     <>
       <p className={`lede msg-lede ${open || composing ? 'hide-phone' : ''}`} style={{ marginBottom: 14 }}>
         {mine.length
-          ? 'Meldinger fra hytteeierne til deg og styrene du er med i. Bare de som er med i samtalen ser den.'
+          ? 'Meldinger mellom hytteeierne og deg eller styrene du er med i. Du kan også starte en melding til en bestemt hytteeier. Bare de som er med i samtalen ser den.'
           : me.veilagOnly
             ? 'Private meldinger til styret i Mørvikveien Veilag. Meldingene leses av styret og grunneier.'
             : 'Private meldinger til grunneier eller styrene. Meldinger til styrene leses også av grunneier, så ingen henvendelse blir liggende.'}
@@ -146,7 +146,7 @@ export function MessagesPage() {
         </div>
 
         {composing ? (
-          <NewThread choices={choices} onCancel={() => setComposing(false)}
+          <NewThread choices={choices} mine={mine} dir={dir} uid={uid} onCancel={() => setComposing(false)}
             onSent={(id) => { setComposing(false); setOpenId(id); markRead(id); void load(); }} />
         ) : open ? (
           <Conversation key={open.id} t={open} dir={dir} uid={uid} title={counterpart(open)}
@@ -236,9 +236,25 @@ function Conversation({ t, dir, uid, title, onBack, onSent, toast }: {
 }
 
 /* ---------- Ny samtale ---------- */
-function NewThread({ choices, onCancel, onSent }: { choices: Recipient[]; onCancel: () => void; onSent: (id: string) => void }) {
+const FROM_LABEL: Record<Recipient, string> = { grunneier: 'Grunneier', vel: 'Mørvika Vel', vei: 'Mørvikveien Veilag' };
+
+function NewThread({ choices, mine, dir, uid, onCancel, onSent }: {
+  choices: Recipient[]; mine: Recipient[]; dir: Directory; uid: string; onCancel: () => void; onSent: (id: string) => void;
+}) {
   const toast = useToast();
   const [to, setTo] = useState<Recipient>(choices[0]);
+  // Grunneier og styrene starter som standard en melding til en hytteeier
+  const [mode, setMode] = useState<'eier' | 'styret'>(mine.length ? 'eier' : 'styret');
+  const [from, setFrom] = useState<Recipient>(mine[0] ?? 'grunneier');
+  const [person, setPerson] = useState<string | null>(null);
+  const [q, setQ] = useState('');
+  const owners = useMemo(() => [...dir.values()].filter((p) => p.cabins.length && p.id !== uid)
+    .sort((a, b) => a.cabins[0].localeCompare(b.cabins[0], 'nb', { numeric: true })), [dir, uid]);
+  const hits = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return s ? owners.filter((p) => p.name.toLowerCase().includes(s) || p.cabins.some((c) => c.toLowerCase().includes(s))).slice(0, 8) : [];
+  }, [q, owners]);
+  const chosen = person ? dir.get(person) : undefined;
   const [subject, setSubject] = useState('');
   const [text, setText] = useState('');
   const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -254,8 +270,16 @@ function NewThread({ choices, onCancel, onSent }: { choices: Recipient[]; onCanc
     e.preventDefault();
     if (!subject.trim() || (!text.trim() && !drafts.length)) return;
     setBusy(true);
-    const { data, error } = await supabase.from('threads').insert({ recipient: to, subject: subject.trim() }).select('id').single();
-    if (error || !data) { setBusy(false); toast('Meldingen ble ikke sendt. Prøv igjen.'); return; }
+    if (mode === 'eier' && !person) { setBusy(false); toast('Velg hvem meldingen skal til.'); return; }
+    const row = mode === 'eier' ? { owner_id: person, recipient: from, subject: subject.trim() } : { recipient: to, subject: subject.trim() };
+    const { data, error } = await supabase.from('threads').insert(row).select('id').single();
+    if (error || !data) {
+      setBusy(false);
+      toast(mode === 'eier' && error?.code === '42501'
+        ? 'Meldingen ble ikke sendt. Hytteeiere i Torpum kan bare få meldinger fra Mørvikveien Veilag.'
+        : 'Meldingen ble ikke sendt. Prøv igjen.');
+      return;
+    }
     const id = data.id as string;
     let images: string[] = [];
     try { if (drafts.length) images = await uploadImages('meldinger', id, drafts); }
@@ -263,7 +287,7 @@ function NewThread({ choices, onCancel, onSent }: { choices: Recipient[]; onCanc
     const { error: e2 } = await supabase.from('messages').insert({ thread_id: id, body: text.trim(), images });
     setBusy(false);
     if (e2) { toast('Meldingen ble ikke sendt. Prøv igjen.'); return; }
-    toast(`Meldingen er sendt til ${TO_TEXT[to]}.`);
+    toast(mode === 'eier' ? `Meldingen er sendt til ${chosen?.name ?? 'hytteeieren'}.` : `Meldingen er sendt til ${TO_TEXT[to]}.`);
     onSent(id);
   }
 
@@ -274,7 +298,44 @@ function NewThread({ choices, onCancel, onSent }: { choices: Recipient[]; onCanc
         <h3 className="serif">Ny melding</h3>
       </div>
       <form className="form" style={{ padding: 18, margin: 0 }} onSubmit={submit}>
-        {choices.length > 1 ? (
+        {mine.length > 0 && (
+          <div className="seg full" role="radiogroup" aria-label="Hvem skal meldingen til" style={{ maxWidth: 'none' }}>
+            <button type="button" role="radio" aria-checked={mode === 'eier'} className={mode === 'eier' ? 'on' : ''} onClick={() => setMode('eier')}>Til en hytteeier</button>
+            <button type="button" role="radio" aria-checked={mode === 'styret'} className={mode === 'styret' ? 'on' : ''} onClick={() => setMode('styret')}>Til grunneier eller et styre</button>
+          </div>
+        )}
+        {mode === 'eier' ? (
+          <>
+            <div className="field full">Til
+              {chosen ? (
+                <div className="chosen"><span><b>{chosen.name}</b> <span className="muted">{chosen.cabins.join(', ')}</span></span>
+                  <button type="button" className="btn small ghost" onClick={() => { setPerson(null); setQ(''); }}>Bytt</button></div>
+              ) : (
+                <>
+                  <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Søk på navn eller hytte, f.eks. «Hytte 12» eller «Kari»" aria-label="Søk etter hytteeier" autoFocus />
+                  {hits.length > 0 && (
+                    <div className="pickl" role="listbox">
+                      {hits.map((p) => (
+                        <button type="button" key={p.id} role="option" aria-selected={false} onClick={() => { setPerson(p.id); setQ(''); if (p.cabins.every((c) => c.startsWith('Torpum'))) setFrom('vei'); }}>
+                          <b>{p.name}</b><span className="muted">{p.cabins.join(', ')}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {q.trim() && hits.length === 0 && <span className="hint">Ingen hytteeier med konto passer. Eiere som ikke har logget inn ennå, kan ikke få meldinger i appen.</span>}
+                </>
+              )}
+            </div>
+            {mine.length > 1 && (
+              <label className="field full" htmlFor="nt-from">Fra
+                <select id="nt-from" value={from} onChange={(e) => setFrom(e.target.value as Recipient)}>
+                  {mine.map((r) => <option key={r} value={r}>{FROM_LABEL[r]}</option>)}
+                </select>
+                <span className="hint">Hytteeieren ser meldingen som fra {FROM_LABEL[from]}. {from !== 'grunneier' ? 'Styret og grunneier kan lese og svare i samtalen.' : ''}</span>
+              </label>
+            )}
+          </>
+        ) : choices.length > 1 ? (
           <div className="field full">Til
             <div className="tochoice">
               {choices.map((r) => (
@@ -302,7 +363,7 @@ function NewThread({ choices, onCancel, onSent }: { choices: Recipient[]; onCanc
         {drafts.length > 0 && <div className="full"><DraftStrip drafts={drafts} className="mdrafts" onRemove={(k) => setDrafts((d) => d.filter((x) => x.key !== k))} /></div>}
         <div className="actions full">
           <button type="button" className="btn ghost" onClick={onCancel}>Avbryt</button>
-          <button className="btn primary" disabled={busy || !subject.trim() || (!text.trim() && !drafts.length)}>
+          <button className="btn primary" disabled={busy || !subject.trim() || (!text.trim() && !drafts.length) || (mode === 'eier' && !person)}>
             <Icon name="send" size={16} />{busy ? 'Sender …' : 'Send'}
           </button>
         </div>
