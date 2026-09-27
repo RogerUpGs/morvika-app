@@ -6,6 +6,7 @@ import { dShort } from '../lib/format';
 import { ROLE_LABEL, type AppRole, type Area } from '../lib/types';
 import { Icon } from '../components/Icon';
 import { PushSetup } from '../components/PushSetup';
+import { ArchiveTab } from '../components/ArchiveTab';
 
 /* ---------- Typer ---------- */
 interface AdminCabin {
@@ -42,7 +43,8 @@ function StatusPill({ s }: { s: PersonStatus }) {
 
 /* ---------- Hovedside ---------- */
 export function AdminPage() {
-  const [tab, setTab] = useState<'hytter' | 'personer' | 'oppsett'>('hytter');
+  const [tab, setTab] = useState<'hytter' | 'personer' | 'arkiv' | 'oppsett'>('hytter');
+  const [archiveCabin, setArchiveCabin] = useState<string | null>(null);
   const [cabins, setCabins] = useState<AdminCabin[] | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -67,19 +69,21 @@ export function AdminPage() {
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'hytter'} className={tab === 'hytter' ? 'on' : ''} onClick={() => setTab('hytter')}>Hytter og eiere</button>
         <button role="tab" aria-selected={tab === 'personer'} className={tab === 'personer' ? 'on' : ''} onClick={() => setTab('personer')}>Personer og roller</button>
+        <button role="tab" aria-selected={tab === 'arkiv'} className={tab === 'arkiv' ? 'on' : ''} onClick={() => setTab('arkiv')}>Hyttearkiv</button>
         <button role="tab" aria-selected={tab === 'oppsett'} className={tab === 'oppsett' ? 'on' : ''} onClick={() => setTab('oppsett')}>Oppsett</button>
       </div>
       {tab === 'oppsett' && <PushSetup />}
       {tab !== 'oppsett' && err && <div className="empty">{err} <button className="linkbtn2" onClick={() => void load()}>Prøv igjen</button></div>}
       {tab !== 'oppsett' && !err && cabins === null && <div className="empty">Henter registeret …</div>}
-      {!err && cabins !== null && tab === 'hytter' && <CabinsTab cabins={cabins} people={people} notes={notes} reload={load} />}
+      {!err && cabins !== null && tab === 'hytter' && <CabinsTab cabins={cabins} people={people} notes={notes} reload={load} onArchive={(id) => { setArchiveCabin(id); setTab('arkiv'); }} />}
+      {!err && cabins !== null && tab === 'arkiv' && <ArchiveTab cabins={cabins} initialCabin={archiveCabin} onChanged={() => {}} />}
       {!err && cabins !== null && tab === 'personer' && <PeopleTab cabins={cabins} people={people} reload={load} />}
     </>
   );
 }
 
 /* ---------- Hytter og eiere ---------- */
-function CabinsTab({ cabins, people, notes, reload }: { cabins: AdminCabin[]; people: Person[]; notes: Record<string, string>; reload: () => Promise<void> }) {
+function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: AdminCabin[]; people: Person[]; notes: Record<string, string>; reload: () => Promise<void>; onArchive: (cabinId: string) => void }) {
   const [q, setQ] = useState('');
   const [area, setArea] = useState<Area | 'alle'>('alle');
   const [tomt, setTomt] = useState<Tomt | 'alle'>('alle');
@@ -167,7 +171,7 @@ function CabinsTab({ cabins, people, notes, reload }: { cabins: AdminCabin[]; pe
                       )}
                     </td>
                     <td>{c.vel_member ? 'Ja' : '–'}</td>
-                    <td><button className="btn small" onClick={() => edit(c)}>Rediger</button></td>
+                    <td><span className="rowacts"><button className="btn small" onClick={() => edit(c)}>Rediger</button><button className="btn small ghost" onClick={() => onArchive(c.id)}>Arkiv</button></span></td>
                   </tr>
                 ))}
                 {shown.length === 0 && <tr><td colSpan={8} className="muted">Ingen treff.</td></tr>}
