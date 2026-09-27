@@ -21,6 +21,11 @@ const PATHS = {
   x: 'M6 6l12 12M18 6 6 18',
   check: 'M5 12l5 5 9-10',
   chev: 'M9 5l7 7-7 7',
+  folder: 'M3 6h6l2 2h10v11H3V6Z',
+  photo: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01',
+  book: 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Zm0 13a3 3 0 0 1 3-3h11M9 8h6',
+  upload: 'M12 16V4m0 0-4 4m4-4 4 4M4 16v4h16v-4',
+  more: 'M5 12h.01M12 12h.01M19 12h.01',
   phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2',
   doc: 'M6 3h8l4 4v14H6V3Zm8 0v4h4M9 12h6M9 16h6',
 } as const;

@@ -15,6 +15,7 @@ import { MessagesPage } from '../pages/Messages';
 import { QuickPostPage } from '../pages/QuickPost';
 import { EventsPage } from '../pages/Events';
 import { InfoPage } from '../pages/Info';
+import { MinHyttePage } from '../pages/MinHytte';
 import { sendersFor } from '../lib/types';
 import { useBadges } from '../lib/badges';
 
@@ -56,6 +57,7 @@ export function Shell() {
     case 'del': page = <QuickPostPage go={go} />; break;
     case 'arr': page = <EventsPage />; break;
     case 'info': page = <InfoPage />; break;
+    case 'minhytte': page = <MinHyttePage />; break;
     default: page = <ComingSoon view={view} />;
   }
 

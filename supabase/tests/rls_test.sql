@@ -406,6 +406,19 @@ select pg_temp.check('påminnelsesjobben sender signal for arrangement i morgen'
 set role authenticated;
 
 -- ---------------------------------------------------------------------
+-- Min hytte: kvittering i regnskapet
+-- ---------------------------------------------------------------------
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+insert into storage.objects (bucket_id, name) values ('hytte', public.my_ownership('10000000-0000-0000-0000-000000000047') || '/kvittering.jpg');
+insert into public.cabin_ledger (cabin_id, description, amount, receipt_path)
+  values ('10000000-0000-0000-0000-000000000047', 'Maling', 1200, public.my_ownership('10000000-0000-0000-0000-000000000047') || '/kvittering.jpg');
+select pg_temp.check('eieren ser kvitteringen sin', exists (select 1 from storage.objects where bucket_id = 'hytte' and name like '%/kvittering.jpg'));
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000103';
+select pg_temp.check('eier av en annen hytte ser ikke kvitteringen', not exists (select 1 from storage.objects where bucket_id = 'hytte' and name like '%/kvittering.jpg'));
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select pg_temp.check('grunneier ser ikke kvitteringen', not exists (select 1 from storage.objects where bucket_id = 'hytte' and name like '%/kvittering.jpg'));
+
+-- ---------------------------------------------------------------------
 -- Push-varsler
 -- ---------------------------------------------------------------------
 reset role;
