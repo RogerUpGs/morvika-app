@@ -4,9 +4,11 @@ import type { IconName } from '../components/Icon';
 export interface NavItem { key: string; label: string; icon: IconName; group: 'Min hytte' | 'Fellesskap' | 'Administrasjon' | 'Deg' }
 
 export function useNavItems(): NavItem[] {
-  const { fullCabins, roles, veilagOnly } = useMe();
+  const { fullCabins, roles, veilagOnly, isResident, former } = useMe();
   const items: NavItem[] = [];
-  if (fullCabins.length) items.push({ key: 'minhytte', label: 'Min hytte', icon: 'home', group: 'Min hytte' });
+  if (fullCabins.length || former.length) items.push({ key: 'minhytte', label: 'Min hytte', icon: 'home', group: 'Min hytte' });
+  // Tidligere eier uten annen hytte eller rolle: bare Min hytte (lesetilgang etter eierskifte)
+  if (!isResident) { items.push({ key: 'profil', label: 'Min profil', icon: 'user', group: 'Deg' }); return items; }
   if (!veilagOnly) items.push({ key: 'chat', label: 'Hyttepraten', icon: 'chat', group: 'Fellesskap' });
   items.push(
     { key: 'nyheter', label: 'Nyheter', icon: 'news', group: 'Fellesskap' },

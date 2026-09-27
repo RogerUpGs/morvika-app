@@ -419,6 +419,50 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 select pg_temp.check('grunneier ser ikke kvitteringen', not exists (select 1 from storage.objects where bucket_id = 'hytte' and name like '%/kvittering.jpg'));
 
 -- ---------------------------------------------------------------------
+-- Eierskifte fra appen (admin_transfer), selgerens tilgang og sletting
+-- ---------------------------------------------------------------------
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+delete from storage.objects where bucket_id = 'hytte' and name like '%/tegninger.pdf';
+reset role;
+select pg_temp.check('ny eier kan slette fil som selgeren ga videre', not exists (select 1 from storage.objects where name like '%/tegninger.pdf'));
+set role authenticated;
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000047';
+select pg_temp.denied('hytteeier kan ikke registrere eierskifte',
+  $$select public.admin_transfer('10000000-0000-0000-0000-000000000088', current_date, 'salg', '[{"name":"X"}]')$$);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.admin_transfer('10000000-0000-0000-0000-000000000088', current_date, 'salg',
+  '[{"name":"Nina Ny","email":"Nina@Example.no","phone":"900 00 001"}]', 'Solgt') as t2 \gset
+select pg_temp.check('historikken viser selgeren', (select sellers from public.admin_transfers('10000000-0000-0000-0000-000000000088') limit 1) = 'Hilde Berg');
+select pg_temp.check('ny eier uten konto ligger som ventende',
+  exists (select 1 from public.admin_people() where full_name = 'Nina Ny' and status = 'venter' and '10000000-0000-0000-0000-000000000088' = any (cabin_ids)));
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000088';
+select pg_temp.check('selgeren ser hytta som tidligere hytte i 90 dager',
+  (select access_until from public.my_former_cabins() where cabin_id = '10000000-0000-0000-0000-000000000088') = current_date + 90);
+select pg_temp.check('selgeren er ikke lenger eier', not exists (select 1 from public.cabin_owners where user_id = '00000000-0000-0000-0000-000000000088'));
+select pg_temp.check('selgeren beholder styrerollen i Veilaget', public.is_resident());
+
+reset role;
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-000000000301', 'nina@example.no');
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000301';
+select pg_temp.check('ny eier kobles til hytta og den nye eierperioden ved første innlogging',
+  public.my_ownership('10000000-0000-0000-0000-000000000088') = (select to_ownership from public.ownership_transfers where id = :'t2'));
+
+reset role;
+insert into public.cabin_documents (cabin_id, ownership_id, name, storage_path)
+  select cabin_id, id, 'Gammel.pdf', id || '/gammel.pdf' from public.ownerships where id = (select from_ownership from public.ownership_transfers where id = :'t2');
+update public.ownerships set access_until = current_date - 1 where id = (select from_ownership from public.ownership_transfers where id = :'t2');
+select public.purge_expired_ownerships() as purged \gset
+select pg_temp.check('sletting etter fristen fjerner selgerens data', :purged >= 1
+  and not exists (select 1 from public.cabin_documents where name = 'Gammel.pdf'));
+select pg_temp.check('filene legges i søppelkassen for sletting', exists (select 1 from public.storage_trash where path like '%/gammel.pdf'));
+select pg_temp.check('sletting gir signal til funksjonen som sletter filene', exists (select 1 from net.calls where body->>'table' = 'storage_trash'));
+select pg_temp.check('overleverte dokumenter slettes ikke', exists (select 1 from public.cabin_documents where name = 'Byggetegninger.pdf'));
+set role authenticated;
+
+-- ---------------------------------------------------------------------
 -- Push-varsler
 -- ---------------------------------------------------------------------
 reset role;

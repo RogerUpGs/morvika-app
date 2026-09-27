@@ -84,6 +84,7 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260928000000_arrangementer_info.sql` | Arrangementer med påmelding og påminnelse, kontakter, dokumentmapper | 27. sep 2026 |
 | `20260928010000_min_hytte.sql` | Min hytte: kvittering på regnskapsposter | 27. sep 2026 |
 | `20260928020000_sb_nummer.sql` | Betegnelse «SB-12 · Mørvikveien» i stedet for «Hytte 12 · …» | |
+| `20260928030000_eierskifte_app.sql` | Eierskifte fra appen, selgerens tilgang i 90 dager, sletting etter fristen | |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 

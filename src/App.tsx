@@ -10,7 +10,7 @@ function Gate() {
   const me = useMe();
   if (me.loading) return <Splash />;
   if (!me.session) return <Login />;
-  if (!me.isResident) return <NotInvited />;
+  if (!me.isResident && !me.former.length) return <NotInvited />;
   if (!me.profile?.full_name) return <AskName />;
   return <BadgesProvider><Shell /></BadgesProvider>;
 }

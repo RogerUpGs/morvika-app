@@ -7,6 +7,7 @@ import { ROLE_LABEL, type AppRole, type Area } from '../lib/types';
 import { Icon } from '../components/Icon';
 import { PushSetup } from '../components/PushSetup';
 import { ArchiveTab } from '../components/ArchiveTab';
+import { TransferPanel } from '../components/TransferPanel';
 
 /* ---------- Typer ---------- */
 interface AdminCabin {
@@ -89,6 +90,7 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
   const [area, setArea] = useState<Area | 'alle'>('alle');
   const [tomt, setTomt] = useState<Tomt | 'alle'>('alle');
   const [editing, setEditing] = useState<AdminCabin | null>(null);
+  const [transfer, setTransfer] = useState<AdminCabin | null>(null);
   const [showQuick, setShowQuick] = useState(true);
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -108,8 +110,12 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
     ['Mangler e-post', owners.filter((o) => o.status === 'mangler_epost').length, 'kan ikke logge inn'],
   ] as const;
 
+  function startTransfer(c: AdminCabin) {
+    setTransfer(c); setEditing(null);
+    window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  }
   function edit(c: AdminCabin) {
-    setEditing(c); setShowQuick(true);
+    setEditing(c); setShowQuick(true); setTransfer(null);
     window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   }
 
@@ -122,7 +128,9 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
       </div>
 
       <div ref={formRef}>
-        {showQuick ? (
+        {transfer ? (
+          <TransferPanel key={transfer.id} cabin={transfer} sellers={ownersOf(transfer.id)} onDone={reload} onClose={() => setTransfer(null)} />
+        ) : showQuick ? (
           <CabinForm key={editing?.id ?? 'ny'} cabins={cabins} editing={editing} owners={editing ? ownersOf(editing.id) : []}
             note={editing ? notes[editing.id] ?? '' : ''}
             onSaved={async () => { await reload(); }}
@@ -172,7 +180,7 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
                       )}
                     </td>
                     <td>{c.vel_member ? 'Ja' : '–'}</td>
-                    <td><span className="rowacts"><button className="btn small" onClick={() => edit(c)}>Rediger</button><button className="btn small ghost" onClick={() => onArchive(c.id)}>Arkiv</button></span></td>
+                    <td><span className="rowacts col"><button className="btn small" onClick={() => edit(c)}>Rediger</button><button className="btn small ghost" onClick={() => startTransfer(c)}>Eierskifte</button><button className="btn small ghost" onClick={() => onArchive(c.id)}>Arkiv</button></span></td>
                   </tr>
                 ))}
                 {shown.length === 0 && <tr><td colSpan={8} className="muted">Ingen treff.</td></tr>}

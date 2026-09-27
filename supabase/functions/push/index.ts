@@ -2,7 +2,8 @@
 //
 // Databasen kaller denne funksjonen når det lagres et nytt varsel, en nyhet,
 // en melding eller en kommentar. Funksjonen spør databasen hvem som skal ha
-// varsel (push_targets) og sender push til telefonene deres.
+// varsel (push_targets) og sender push til telefonene deres. Den rydder også
+// bort filer fra Min hytte når fristen etter et eierskifte har gått ut.
 //
 // Oppsett i Supabase (Edge Functions):
 //   * Navn: push. «Verify JWT with legacy secret» / «Enforce JWT» skal være AV.
@@ -16,6 +17,23 @@ webpush.setVapidDetails('mailto:noreply@morvika.no', Deno.env.get('VAPID_PUBLIC_
 
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
 
+async function emptyTrash() {
+  const { data } = await supa.from('storage_trash').select('bucket,path').limit(1000);
+  const rows = (data ?? []) as { bucket: string; path: string }[];
+  let removed = 0;
+  for (const bucket of new Set(rows.map((r) => r.bucket))) {
+    const paths = rows.filter((r) => r.bucket === bucket).map((r) => r.path);
+    for (let i = 0; i < paths.length; i += 100) {
+      const chunk = paths.slice(i, i + 100);
+      const { error } = await supa.storage.from(bucket).remove(chunk);
+      if (error) { console.error('sletting feilet', bucket, error.message); continue; }
+      await supa.from('storage_trash').delete().eq('bucket', bucket).in('path', chunk);
+      removed += chunk.length;
+    }
+  }
+  return { removed };
+}
+
 interface Target { user_id: string; title: string; body: string; url: string; tag: string; urgent: boolean }
 
 Deno.serve(async (req) => {
@@ -23,6 +41,9 @@ Deno.serve(async (req) => {
   const { table, id } = await req.json().catch(() => ({} as Record<string, string>));
   // Databasen (push_targets) avgjør hva som skal sendes; ukjente tabeller gir ingen mottakere
   if (!/^[a-z_]{1,40}$/.test(table ?? '') || !/^[0-9a-f-]{36}$/i.test(id ?? '')) return json({ error: 'ugyldig' }, 400);
+
+  // Rydding: slett filer som databasen har lagt i storage_trash (Min hytte etter fristen ved eierskifte)
+  if (table === 'storage_trash') return json(await emptyTrash());
 
   const { data: targets, error } = await supa.rpc('push_targets', { p_table: table, p_id: id });
   if (error) return json({ error: error.message }, 500);

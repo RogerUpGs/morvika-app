@@ -30,7 +30,7 @@ export function Shell() {
   const [light, toggleTheme] = useTheme();
   const items = useNavItems();
   const badges = useBadges();
-  const pcStart = me.veilagOnly ? 'nyheter' : 'chat';
+  const pcStart = !me.isResident ? 'minhytte' : me.veilagOnly ? 'nyheter' : 'chat';
   const [route, go] = useRoute(isPhone ? 'hjem' : pcStart);
   const canPost = sendersFor(me.roles).some((s) => s !== 'admin');
   const known = route === 'hjem' || (route === 'del' && canPost) || items.some((i) => i.key === route);

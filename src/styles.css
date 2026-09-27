@@ -626,3 +626,25 @@ tr.editing td{background:var(--primary-soft)}
 .picktable tbody tr:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
 .archive-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:16px;align-items:start}
 @media (max-width:900px){.archive-cols{grid-template-columns:1fr}.archive-scroll{max-height:45vh}}
+
+/* ---------- Tidligere hytte (etter eierskifte) ---------- */
+.former{display:flex;flex-direction:column;gap:14px}
+.formerbanner{display:flex;gap:14px;align-items:flex-start;border-color:color-mix(in srgb,var(--accent) 50%,var(--line));background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+.formerbanner > svg{color:var(--accent);flex:none;margin-top:2px}
+.formerbanner b{font-size:16px}
+.formerbanner p{margin:4px 0 0;color:var(--muted)}
+.familycard h3{margin:0 0 4px;font-size:19px}
+.familycard p{margin:0 0 12px}
+.handbar{position:sticky;top:calc(env(safe-area-inset-top,0px) + 96px);z-index:4;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 14px;padding:10px 14px;border-radius:12px;background:var(--ink);color:var(--bg)}
+.handbar .confirm{color:var(--bg)}
+.selrow{grid-template-columns:auto minmax(0,1fr) auto}
+.selbox{display:flex;align-items:center;gap:10px;cursor:pointer}
+.selbox input,.ptsel input{width:20px;height:20px;accent-color:var(--primary)}
+.selbox .ftag{width:48px}
+.ptsel{position:absolute;top:6px;left:6px;width:34px;height:34px;border-radius:8px;background:rgba(0,0,0,.55);display:grid;place-items:center;cursor:pointer}
+.transfer-sum{padding:12px 16px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);font-size:14px}
+.transfer-sum ul{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.histlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.rowacts.col{flex-direction:column;align-items:stretch;gap:4px}
+.rowacts.col .btn{justify-content:center}
+@media (max-width:900px){.hide-phone{display:none}}

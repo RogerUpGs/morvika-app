@@ -7,6 +7,7 @@ import { shrinkImage, toDrafts, uploadImages, useSignedUrls, type Draft } from '
 import { Lightbox } from '../components/Media';
 import { Icon } from '../components/Icon';
 import type { Cabin } from '../lib/types';
+import { FormerHytte } from './FormerHytte';
 
 type Tab = 'home' | 'dok' | 'foto' | 'regn';
 const FOLDERS = ['Kontrakter', 'Forsikring', 'Tegninger', 'Kvitteringer'];
@@ -36,8 +37,9 @@ export function MinHyttePage() {
   const me = useMe();
   const toast = useToast();
   const cabins = me.fullCabins;
-  const [cabinId, setCabinId] = useState(cabins[0]?.id ?? '');
-  const cabin = cabins.find((c) => c.id === cabinId) ?? cabins[0];
+  const [cabinId, setCabinId] = useState(cabins[0]?.id ?? (me.former[0] ? `old:${me.former[0].ownership_id}` : ''));
+  const formerSel = cabinId.startsWith('old:') ? me.former.find((f) => `old:${f.ownership_id}` === cabinId) ?? null : null;
+  const cabin = formerSel ? undefined : cabins.find((c) => c.id === cabinId) ?? cabins[0];
   const [tab, setTab] = useState<Tab>('home');
   const [own, setOwn] = useState<string | null>(null);
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -67,6 +69,13 @@ export function MinHyttePage() {
   }, [cabin]);
   useEffect(() => { setLoaded(false); void load(); }, [load]);
 
+  const picker = cabins.length + me.former.length > 1 && (tab === 'home' || formerSel) && (
+    <div className="chips" role="group" aria-label="Velg hytte">
+      {cabins.map((c) => <button key={c.id} className={`chip ${c.id === cabin?.id ? 'on' : ''}`} onClick={() => { setCabinId(c.id); setTab('home'); }}>{c.label}</button>)}
+      {me.former.map((f) => <button key={f.ownership_id} className={`chip ${formerSel?.ownership_id === f.ownership_id ? 'on' : ''}`} onClick={() => setCabinId(`old:${f.ownership_id}`)}>Tidligere: {f.label}</button>)}
+    </div>
+  );
+  if (formerSel) return <>{picker}<FormerHytte key={formerSel.ownership_id} f={formerSel} /></>;
   if (!cabin) return <div className="empty">Du eier ingen hytte med Min hytte.</div>;
   if (loaded && !own) return <div className="empty">Min hytte kunne ikke åpnes. Ta kontakt med administrator.</div>;
 
@@ -75,11 +84,7 @@ export function MinHyttePage() {
 
   return (
     <>
-      {cabins.length > 1 && tab === 'home' && (
-        <div className="chips" role="group" aria-label="Velg hytte">
-          {cabins.map((c) => <button key={c.id} className={`chip ${c.id === cabin.id ? 'on' : ''}`} onClick={() => setCabinId(c.id)}>{c.label}</button>)}
-        </div>
-      )}
+      {picker}
       {tab === 'home' ? (
         <HytteHome cabin={cabin} name={me.profile?.full_name ?? ''} docs={docs} archive={archive} photos={photos} albums={albums} ledger={ledger} go={setTab} />
       ) : (
