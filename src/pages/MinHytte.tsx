@@ -446,6 +446,12 @@ function Ledger({ cabinId, own, ledger, reload, toast, label }: {
   const max = cats[0]?.[1] || 1;
   const receipts = useSignedUrls('hytte', L.map((x) => x.receipt_path).filter(Boolean) as string[]);
   const [lb, setLb] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Entry | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  function edit(x: Entry) {
+    setEditing(x); setConfirmDel(null);
+    window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
+  }
 
   async function remove(x: Entry) {
     const { error } = await supabase.from('cabin_ledger').delete().eq('id', x.id);
@@ -487,7 +493,10 @@ function Ledger({ cabinId, own, ledger, reload, toast, label }: {
             {!cats.length && <p className="muted" style={{ margin: 0 }}>Ingen utgifter ført i {year}.</p>}
           </div>
         </div>
-        <EntryForm cabinId={cabinId} own={own} onDone={reload} toast={toast} />
+        <div ref={formRef}>
+          <EntryForm key={editing?.id ?? 'ny'} cabinId={cabinId} own={own} editing={editing} toast={toast}
+            onDone={async () => { setEditing(null); await reload(); }} onCancel={() => setEditing(null)} />
+        </div>
       </div>
       <div className="card" style={{ marginTop: 16, padding: '6px 8px' }}>
         <div className="tbl-wrap">
@@ -495,15 +504,17 @@ function Ledger({ cabinId, own, ledger, reload, toast, label }: {
             <thead><tr><th>Dato</th><th>Beskrivelse</th><th>Kategori</th><th className="r">Beløp</th><th /></tr></thead>
             <tbody>
               {L.map((x) => (
-                <tr key={x.id}>
+                <tr key={x.id} className={editing?.id === x.id ? 'editing' : ''}>
                   <td className="num">{dShort(x.entry_date)}</td>
                   <td>{x.description}{x.receipt_path && receipts[x.receipt_path] && (
                     <button className="rcptbtn" onClick={() => setLb(receipts[x.receipt_path!])} aria-label="Vis kvittering"><Icon name="photo" size={14} />Kvittering</button>)}</td>
                   <td className="muted">{x.category}</td>
                   <td className={`r num ${x.kind === 'inn' ? 'in' : ''}`}>{x.kind === 'inn' ? '+ ' : '− '}{kr(x.amount)}</td>
-                  <td className="r">{confirmDel === x.id
-                    ? <button className="btn small danger-btn" onClick={() => void remove(x)}>Slett</button>
-                    : <button className="linkbtn" onClick={() => setConfirmDel(x.id)} aria-label={`Slett ${x.description}`}>Slett</button>}</td>
+                  <td className="r"><span className="rowacts">
+                    <button className="linkbtn2" onClick={() => edit(x)} aria-label={`Rediger ${x.description}`}>Rediger</button>
+                    {confirmDel === x.id
+                      ? <button className="btn small danger-btn" onClick={() => void remove(x)}>Slett</button>
+                      : <button className="linkbtn" onClick={() => setConfirmDel(x.id)} aria-label={`Slett ${x.description}`}>Slett</button>}</span></td>
                 </tr>
               ))}
               {!L.length && <tr><td colSpan={5} className="muted">Ingen poster i {year}.</td></tr>}
@@ -516,13 +527,16 @@ function Ledger({ cabinId, own, ledger, reload, toast, label }: {
   );
 }
 
-function EntryForm({ cabinId, own, onDone, toast }: { cabinId: string; own: string; onDone: () => Promise<void>; toast: (m: string) => void }) {
-  const [date, setDate] = useState(today());
-  const [kind, setKind] = useState<'ut' | 'inn'>('ut');
-  const [text, setText] = useState('');
-  const [cat, setCat] = useState(CATS[0]);
-  const [amount, setAmount] = useState('');
+function EntryForm({ cabinId, own, editing, onDone, onCancel, toast }: {
+  cabinId: string; own: string; editing: Entry | null; onDone: () => Promise<void>; onCancel: () => void; toast: (m: string) => void;
+}) {
+  const [date, setDate] = useState(editing?.entry_date ?? today());
+  const [kind, setKind] = useState<'ut' | 'inn'>(editing?.kind ?? 'ut');
+  const [text, setText] = useState(editing?.description ?? '');
+  const [cat, setCat] = useState(editing?.category ?? CATS[0]);
+  const [amount, setAmount] = useState(editing ? String(editing.amount).replace('.', ',') : '');
   const [receipt, setReceipt] = useState<File | null>(null);
+  const [dropReceipt, setDropReceipt] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -539,17 +553,23 @@ function EntryForm({ cabinId, own, onDone, toast }: { cabinId: string; own: stri
       if (up.error) { setBusy(false); toast('Kvitteringen ble ikke lastet opp.'); return; }
       receipt_path = path;
     }
-    const { error } = await supabase.from('cabin_ledger').insert({ cabin_id: cabinId, ownership_id: own, entry_date: date, kind, description: text.trim(), category: cat, amount: amt, receipt_path });
+    const fields = { entry_date: date, kind, description: text.trim(), category: cat, amount: amt };
+    const old = editing?.receipt_path ?? null;
+    const newReceipt = receipt_path ?? (dropReceipt ? null : old);
+    const { error } = editing
+      ? await supabase.from('cabin_ledger').update({ ...fields, receipt_path: newReceipt }).eq('id', editing.id)
+      : await supabase.from('cabin_ledger').insert({ cabin_id: cabinId, ownership_id: own, ...fields, receipt_path });
     setBusy(false);
     if (error) { if (receipt_path) await supabase.storage.from('hytte').remove([receipt_path]); toast('Posten ble ikke lagret.'); return; }
+    if (editing && old && old !== newReceipt) await supabase.storage.from('hytte').remove([old]);
     setText(''); setAmount(''); setReceipt(null); if (fileRef.current) fileRef.current.value = '';
-    toast('Posten er ført.');
+    toast(editing ? 'Endringene er lagret.' : 'Posten er ført.');
     await onDone();
   }
 
   return (
-    <div className="card">
-      <h3 className="serif" style={{ margin: '0 0 12px', fontSize: 18 }}>Før ny post</h3>
+    <div className={`card ${editing ? 'editcard' : ''}`}>
+      <h3 className="serif" style={{ margin: '0 0 12px', fontSize: 18 }}>{editing ? 'Rediger post' : 'Før ny post'}</h3>
       <form className="form" style={{ margin: 0 }} onSubmit={submit}>
         <label className="field" htmlFor="lg-date">Dato<input id="lg-date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} /></label>
         <label className="field" htmlFor="lg-kind">Type
@@ -559,10 +579,16 @@ function EntryForm({ cabinId, own, onDone, toast }: { cabinId: string; own: stri
         <label className="field full" htmlFor="lg-text">Beskrivelse<input id="lg-text" type="text" required value={text} onChange={(e) => setText(e.target.value)} placeholder="F.eks. Strøm juli–september" /></label>
         <label className="field" htmlFor="lg-cat">Kategori<select id="lg-cat" value={cat} onChange={(e) => setCat(e.target.value)}>{CATS.map((c) => <option key={c}>{c}</option>)}</select></label>
         <label className="field" htmlFor="lg-amt">Beløp (kr)<input id="lg-amt" type="text" inputMode="decimal" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" /></label>
-        <label className="field full" htmlFor="lg-rcpt">Kvittering (valgfritt)
-          <input id="lg-rcpt" ref={fileRef} type="file" accept="image/*" onChange={(e) => setReceipt(e.target.files?.[0] ?? null)} />
+        <label className="field full" htmlFor="lg-rcpt">{editing?.receipt_path ? 'Bytt kvittering (valgfritt)' : 'Kvittering (valgfritt)'}
+          <input id="lg-rcpt" ref={fileRef} type="file" accept="image/*" onChange={(e) => { setReceipt(e.target.files?.[0] ?? null); setDropReceipt(false); }} />
         </label>
-        <div className="actions full"><button className="btn primary" disabled={busy}>{busy ? 'Lagrer …' : 'Legg til'}</button></div>
+        {editing?.receipt_path && !receipt && (
+          <label className="check full"><input type="checkbox" checked={dropReceipt} onChange={(e) => setDropReceipt(e.target.checked)} />Fjern kvitteringen</label>
+        )}
+        <div className="actions full">
+          {editing && <button type="button" className="btn ghost" onClick={onCancel}>Avbryt</button>}
+          <button className="btn primary" disabled={busy}>{busy ? 'Lagrer …' : editing ? 'Lagre endringer' : 'Legg til'}</button>
+        </div>
       </form>
     </div>
   );

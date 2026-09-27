@@ -82,7 +82,7 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260927220000_samtale_fra_styret.sql` | Grunneier og styrene kan starte en samtale med en hytteeier | 27. sep 2026 |
 | `20260927230000_nyheter_bilder.sql` | Bilder i nyheter («Del fra feltet») | 27. sep 2026 |
 | `20260928000000_arrangementer_info.sql` | Arrangementer med påmelding og påminnelse, kontakter, dokumentmapper | 27. sep 2026 |
-| `20260928010000_min_hytte.sql` | Min hytte: kvittering på regnskapsposter | |
+| `20260928010000_min_hytte.sql` | Min hytte: kvittering på regnskapsposter | 27. sep 2026 |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 
