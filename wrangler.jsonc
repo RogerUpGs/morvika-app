@@ -1,0 +1,10 @@
+// Publisering på Cloudflare (Workers med statiske filer).
+// Bygg: npm run build   Publiser: npx wrangler deploy
+{
+  "name": "morvika-app",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
