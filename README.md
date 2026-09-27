@@ -38,4 +38,14 @@ Web-app (PWA) for kommunikasjon mellom grunneier, Mørvika Vel, Mørvikveien Vei
 - Grunneier har full tilgang til Velet og Veilaget: kan publisere, varsle og lage arrangementer for begge, og leser meldinger til begge styrene.
 - Min hytte ses bare av hyttas eiere, og bare for hytter med full tilgang. Grunneier og administrator har ingen unntak.
 - E-post og telefonnummer er skjult for andre brukere.
+
+## Eierskifte
+
+- Min hytte hører til en **eierperiode** for hytta. Medeiere i samme periode deler Min hytte.
+- Administrator registrerer eierskiftet (`register_transfer`): salg eller overdragelse i familien.
+- Ny eier starter med tom Min hytte. Tidligere eiere kan lese og laste ned sine data i 90 dager.
+- Selgeren velger dokumenter og bilder som skal følge hytta (`hand_over`).
+- Ved overdragelse i familien kan selgeren godkjenne at hele Min hytte følger med (`approve_full_transfer`).
+- **Hyttearkivet** følger hytta: grunneier legger inn festekontrakt o.l., nåværende eiere kan lese.
+- Sletting etter fristen gjøres av en planlagt jobb som lages sammen med Min hytte.
 - Den første brukeren som opprettes, blir grunneier og administrator.

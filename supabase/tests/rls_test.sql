@@ -18,6 +18,9 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-0000-0000-000000000006', 'per@example.no',   '{"full_name":"Per Strand"}'),
   ('00000000-0000-0000-0000-000000000012', 'trond@example.no', '{"full_name":"Trond Aas"}'),
   ('00000000-0000-0000-0000-000000000088', 'hilde@example.no', '{"full_name":"Hilde Berg"}'),
+  ('00000000-0000-0000-0000-000000000101', 'ola@example.no',   '{"full_name":"Ola Kjøper"}'),
+  ('00000000-0000-0000-0000-000000000102', 'siri@example.no',  '{"full_name":"Siri Nilsen"}'),
+  ('00000000-0000-0000-0000-000000000103', 'jonas@example.no', '{"full_name":"Jonas Aas"}'),
   ('00000000-0000-0000-0000-000000000999', 'ukjent@example.no','{}');
 
 insert into public.cabins (id, area, number, label, vel_member, vei_member, access) values
@@ -29,7 +32,8 @@ insert into public.cabin_owners values
   ('10000000-0000-0000-0000-000000000047', '00000000-0000-0000-0000-000000000047'),
   ('10000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000012'),
   ('10000000-0000-0000-0000-000000000088', '00000000-0000-0000-0000-000000000088'),
-  ('10000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000006');
+  ('10000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000006'),
+  ('10000000-0000-0000-0000-000000000047', '00000000-0000-0000-0000-000000000102');
 insert into public.user_roles values
   ('00000000-0000-0000-0000-000000000012', 'styre_vel'),
   ('00000000-0000-0000-0000-000000000088', 'styre_vei');
@@ -50,8 +54,8 @@ insert into public.news (sender, audience, title) values ('grunneier', 'alle',  
 insert into public.alerts (level, sender, audience, title) values ('akutt', 'grunneier', 'alle', 'Vannlekkasje');
 insert into public.shared_documents (title, owner, storage_path) values ('Kart', 'grunneier', 'grunneier/kart.pdf');
 insert into storage.objects (bucket_id, name) values ('dokumenter', 'grunneier/kart.pdf');
-select pg_temp.check('grunneier får størrelse på mottakergruppe (bare hytter med full tilgang)', public.audience_size('alle') = 3);
-select pg_temp.check('Veilagets gruppe teller også Torpum', public.audience_size('vei') = 4);
+select pg_temp.check('grunneier får størrelse på mottakergruppe (bare hytter med full tilgang)', public.audience_size('alle') = 4);
+select pg_temp.check('Veilagets gruppe teller også Torpum', public.audience_size('vei') = 5);
 
 -- ---------------------------------------------------------------------
 -- Hilde (styret i Mørvikveien Veilag) publiserer
@@ -76,8 +80,13 @@ insert into public.news_reads (news_id) select id from public.news;
 insert into public.alert_acks (alert_id) select id from public.alerts;
 select pg_temp.check('Kari ser og bekrefter begge varslene', (select count(*) from public.alert_acks) = 2);
 insert into public.cabin_ledger (cabin_id, description, amount) values ('10000000-0000-0000-0000-000000000047', 'Festeavgift', 8400);
-insert into public.cabin_documents (cabin_id, name, storage_path) values ('10000000-0000-0000-0000-000000000047', 'Festekontrakt.pdf', '10000000-0000-0000-0000-000000000047/festekontrakt.pdf');
-insert into storage.objects (bucket_id, name) values ('hytte', '10000000-0000-0000-0000-000000000047/festekontrakt.pdf');
+insert into public.cabin_documents (cabin_id, name, folder, storage_path)
+  values ('10000000-0000-0000-0000-000000000047', 'Forsikring.pdf', 'Forsikring', public.my_ownership('10000000-0000-0000-0000-000000000047') || '/forsikring.pdf'),
+         ('10000000-0000-0000-0000-000000000047', 'Byggetegninger.pdf', 'Tegninger', public.my_ownership('10000000-0000-0000-0000-000000000047') || '/tegninger.pdf');
+insert into storage.objects (bucket_id, name) values
+  ('hytte', public.my_ownership('10000000-0000-0000-0000-000000000047') || '/forsikring.pdf'),
+  ('hytte', public.my_ownership('10000000-0000-0000-0000-000000000047') || '/tegninger.pdf');
+select pg_temp.check('Kari ser sine egne filer', (select count(*) from storage.objects where bucket_id = 'hytte') = 2);
 select pg_temp.denied('Kari kan ikke skrive i en annen hyttes regnskap',
   $$insert into public.cabin_ledger (cabin_id, description, amount) values ('10000000-0000-0000-0000-000000000012', 'Snikk', 1)$$);
 select pg_temp.denied('Kari kan ikke laste opp i en annen hyttes mappe',
@@ -86,7 +95,7 @@ insert into public.threads (id, recipient, subject) values ('20000000-0000-0000-
 insert into public.messages (thread_id, body) values ('20000000-0000-0000-0000-000000000001', 'Kan jeg felle to furuer?');
 insert into storage.objects (bucket_id, name) values ('meldinger', '20000000-0000-0000-0000-000000000001/furu.jpg');
 insert into public.posts (body) values ('Nydelig morgen');
-select pg_temp.check('Kari ser navnene til alle', (select count(*) from public.profiles) = 6);
+select pg_temp.check('Kari ser navnene til alle', (select count(*) from public.profiles) = 9);
 select pg_temp.denied('e-postkolonnen er skjult for andre', $$select email from public.profiles$$);
 select pg_temp.check('Kari ser sin egen e-post via my_profile', (select email from public.my_profile()) = 'kari@example.no');
 select pg_temp.check('Kari ser begge felles dokumenter', (select count(*) from public.shared_documents) = 2);
@@ -171,6 +180,85 @@ select pg_temp.check('Per ser Veilagets varsel fra grunneier', exists (select 1 
 select pg_temp.check('Per ser svaret fra grunneier i samtalen med Veilaget', (select count(*) from public.messages) = 2);
 
 -- ---------------------------------------------------------------------
+-- Eierskifte: Kari og Siri selger hytte 47 til Ola
+-- ---------------------------------------------------------------------
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000102';
+select pg_temp.check('medeier Siri deler Min hytte med Kari', (select count(*) from public.cabin_ledger) = 1 and (select count(*) from public.cabin_documents) = 2);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000047';
+select pg_temp.denied('Kari kan ikke registrere eierskifte',
+  $$select public.register_transfer('10000000-0000-0000-0000-000000000047', current_date, 'salg', array['00000000-0000-0000-0000-000000000101']::uuid[])$$);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.register_transfer('10000000-0000-0000-0000-000000000047', current_date, 'salg',
+  array['00000000-0000-0000-0000-000000000101']::uuid[], 'Solgt via megler') as t \gset
+insert into public.cabin_archive (cabin_id, title, storage_path) values ('10000000-0000-0000-0000-000000000047', 'Festekontrakt hytte 47', '10000000-0000-0000-0000-000000000047/festekontrakt.pdf');
+insert into storage.objects (bucket_id, name) values ('arkiv', '10000000-0000-0000-0000-000000000047/festekontrakt.pdf');
+select pg_temp.check('grunneier ser eierhistorikken', (select count(*) from public.ownerships where cabin_id = '10000000-0000-0000-0000-000000000047') = 2);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+select pg_temp.check('Ola er nå eier og beboer', public.is_resident());
+select pg_temp.check('Ola starter med tomt regnskap', (select count(*) from public.cabin_ledger) = 0);
+select pg_temp.check('Ola ser ikke Karis dokumenter', (select count(*) from public.cabin_documents) = 0);
+select pg_temp.check('Ola ser ikke Karis filer', (select count(*) from storage.objects where bucket_id = 'hytte') = 0);
+select pg_temp.check('Ola ser festekontrakten i hyttearkivet', (select count(*) from public.cabin_archive) = 1);
+select pg_temp.check('Ola ser arkivfilen', (select count(*) from storage.objects where bucket_id = 'arkiv') = 1);
+insert into public.cabin_ledger (cabin_id, description, amount) values ('10000000-0000-0000-0000-000000000047', 'Festeavgift 2027', 8600);
+insert into storage.objects (bucket_id, name) values ('hytte', public.my_ownership('10000000-0000-0000-0000-000000000047') || '/ola.jpg');
+select pg_temp.check('Ola kan føre i sitt eget regnskap', (select count(*) from public.cabin_ledger) = 1);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000047';
+select pg_temp.check('Kari er ikke lenger beboer', not public.is_resident());
+select pg_temp.check('Kari kan fortsatt lese sine dokumenter i 90 dager', (select count(*) from public.cabin_documents) = 2);
+select pg_temp.check('Kari kan fortsatt lese sitt regnskap', (select count(*) from public.cabin_ledger) = 1);
+select pg_temp.check('Kari kan fortsatt hente sine filer', (select count(*) from storage.objects where bucket_id = 'hytte') = 2);
+select pg_temp.check('Kari ser ikke Olas regnskap', not exists (select 1 from public.cabin_ledger where description = 'Festeavgift 2027'));
+select pg_temp.check('Kari ser ikke hyttearkivet lenger', (select count(*) from public.cabin_archive) = 0);
+select pg_temp.denied('Kari kan ikke føre i regnskapet etter salget',
+  $$insert into public.cabin_ledger (cabin_id, description, amount) values ('10000000-0000-0000-0000-000000000047', 'Etter salg', 1)$$);
+select pg_temp.denied('Kari kan ikke godkjenne «Overfør alt» ved salg', format($$select public.approve_full_transfer(%L)$$, :'t'));
+select public.hand_over(:'t', array(select id from public.cabin_documents where name = 'Byggetegninger.pdf'), '{}') as overlevert \gset
+select pg_temp.check('Kari overleverte byggetegningene', :overlevert = 1);
+select pg_temp.check('Kari har ikke lenger byggetegningene', (select count(*) from public.cabin_documents) = 1);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+select pg_temp.check('Ola ser de overleverte byggetegningene', (select name from public.cabin_documents) = 'Byggetegninger.pdf');
+select pg_temp.check('Ola kan hente filen til byggetegningene', (select count(*) from storage.objects where bucket_id = 'hytte' and name like '%/tegninger.pdf') = 1);
+select pg_temp.check('Ola ser eierskiftet', (select count(*) from public.ownership_transfers) = 1);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000006';
+select pg_temp.check('Per ser ikke hyttearkivet for hytte 47', (select count(*) from public.cabin_archive) = 0);
+
+-- Fristen går ut
+reset role;
+update public.ownerships set access_until = current_date - 1 where id = (select from_ownership from public.ownership_transfers where id = :'t');
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000047';
+select pg_temp.check('etter fristen ser Kari ingen av sine data', (select count(*) from public.cabin_documents) = 0 and (select count(*) from public.cabin_ledger) = 0);
+
+-- ---------------------------------------------------------------------
+-- Overdragelse i familien: Trond gir hytte 12 til sønnen Jonas
+-- ---------------------------------------------------------------------
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+insert into public.cabin_ledger (cabin_id, description, amount) values ('10000000-0000-0000-0000-000000000012', 'Maling', 3200);
+insert into public.cabin_albums (cabin_id, name) values ('10000000-0000-0000-0000-000000000012', 'Sommer');
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.register_transfer('10000000-0000-0000-0000-000000000012', current_date, 'familie',
+  array['00000000-0000-0000-0000-000000000103']::uuid[]) as f \gset
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000103';
+select pg_temp.check('Jonas starter tomt før godkjenning', (select count(*) from public.cabin_ledger) = 0);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select public.approve_full_transfer(:'f');
+select pg_temp.check('Trond har ikke lenger Min hytte etter «Overfør alt»', (select count(*) from public.cabin_ledger) = 0);
+select pg_temp.check('Trond beholder rollen i Velet', public.is_resident());
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000103';
+select pg_temp.check('Jonas har fått hele Min hytte', (select count(*) from public.cabin_ledger) = 1 and (select count(*) from public.cabin_albums) = 1);
+
+-- ---------------------------------------------------------------------
 -- Uinvitert og anonym
 -- ---------------------------------------------------------------------
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000999';
@@ -178,6 +266,7 @@ select pg_temp.check('uinvitert ser ingen nyheter', (select count(*) from public
 select pg_temp.check('uinvitert ser ingen innlegg', (select count(*) from public.posts) = 0);
 select pg_temp.check('uinvitert ser ingen hytter', (select count(*) from public.cabins) = 0);
 select pg_temp.check('uinvitert ser bare sin egen profil', (select count(*) from public.profiles) = 1);
+select pg_temp.check('uinvitert ser ingen eierperioder', (select count(*) from public.ownerships) = 0);
 
 reset request.jwt.claim.sub;
 set role anon;

@@ -69,3 +69,4 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260927120000_grunnmur.sql` | Tabeller, tilgangsregler og lagring | 27. sep 2026 |
 | `20260927143000_torpum_veilag.sql` | Torpum og tilgangsnivået «Bare Veilaget» | 27. sep 2026 |
 | `20260927153000_grunneier_vel_veilag.sql` | Grunneier har full tilgang til Vel og Veilag | |
+| `20260927160000_eierskifte.sql` | Eierperioder, eierskifte og hyttearkiv | |
