@@ -79,7 +79,7 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260927190000_betegnelse.sql` | Veinavn i betegnelsen på hytter som allerede er registrert | 27. sep 2026 |
 | `20260927200000_varsler.sql` | Oversikt over hvem som har bekreftet et varsel | 27. sep 2026 |
 | `20260927210000_push.sql` | Push-varsler: signal til Edge Function, mottakere, abonnement | 27. sep 2026 |
-| `20260927220000_samtale_fra_styret.sql` | Grunneier og styrene kan starte en samtale med en hytteeier | |
+| `20260927220000_samtale_fra_styret.sql` | Grunneier og styrene kan starte en samtale med en hytteeier | 27. sep 2026 |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 
