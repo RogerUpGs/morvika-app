@@ -60,9 +60,11 @@ export const AUDIENCE_LABEL: Record<Audience, string> = {
 /** Avsendere en bruker kan publisere som, ut fra rollene. */
 export function sendersFor(roles: AppRole[]): Sender[] {
   const s: Sender[] = [];
-  if (roles.includes('grunneier')) s.push('grunneier');
-  if (roles.includes('styre_vel')) s.push('vel');
-  if (roles.includes('styre_vei')) s.push('vei');
+  const grunneier = roles.includes('grunneier');
+  // Grunneier har full tilgang til både Velet og Veilaget
+  if (grunneier) s.push('grunneier');
+  if (grunneier || roles.includes('styre_vel')) s.push('vel');
+  if (grunneier || roles.includes('styre_vei')) s.push('vei');
   if (roles.includes('admin')) s.push('admin');
   return s;
 }

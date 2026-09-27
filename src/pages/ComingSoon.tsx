@@ -6,7 +6,7 @@ const INFO: Record<string, { phase: string; title: string; points: string[] }> =
   minhytte: { phase: 'Fase 4', title: 'Min hytte', points: ['Dokumentregister med mapper', 'Fotoalbum', 'Hytteregnskap', 'Bare du og de andre eierne av hytta har tilgang'] },
   chat: { phase: 'Fase 3', title: 'Hyttepraten', points: ['Innlegg med bilder fra telefonen', 'Likes og kommentarer', 'Grupper: Generelt, Kjøp og salg, Dugnad og hjelp'] },
   varsler: { phase: 'Fase 3', title: 'Varsler', points: ['Akutt, Viktig og Til orientering', 'Push til telefonen, e-post som reserve', '«Jeg har sett varselet» med oversikt for avsender'] },
-  meldinger: { phase: 'Fase 3', title: 'Meldinger', points: ['Private samtaler med grunneier eller styrene', 'Bilder fra telefonen i samtalen'] },
+  meldinger: { phase: 'Fase 3', title: 'Meldinger', points: ['Private samtaler med grunneier eller styrene', 'Bilder fra telefonen i samtalen', 'Meldinger til styrene leses også av grunneier, så ingen henvendelse blir liggende'] },
   arr: { phase: 'Fase 3', title: 'Arrangementer og dugnad', points: ['Kalender med påmelding', 'Arrangøren ser hvor mange som kommer'] },
   info: { phase: 'Fase 3', title: 'Info og dokumenter', points: ['Vedtekter, brøyteplan og kart', 'Kontakter til styrene og grunneier'] },
   admin: { phase: 'Fase 2', title: 'Administrasjon', points: ['Hytter, eiere og medlemskap i Vel og Veilag', 'Brukerregister med knapp for ny QR-kode', 'Siste innlogging, innloggede enheter og utlogging fra alle enheter'] },
@@ -15,7 +15,7 @@ const INFO: Record<string, { phase: string; title: string; points: string[] }> =
 /** Det Torpum-brukere får se, som bare har tilgang til Veilaget. */
 const VEILAG: Record<string, string[]> = {
   varsler: ['Varsler fra Mørvikveien Veilag', 'Push til telefonen, e-post som reserve', '«Jeg har sett varselet»'],
-  meldinger: ['Private samtaler med Veilagets styre', 'Bilder fra telefonen i samtalen, for eksempel av hull i veien'],
+  meldinger: ['Private samtaler med Veilagets styre', 'Bilder fra telefonen i samtalen, for eksempel av hull i veien', 'Meldingene leses av Veilagets styre og grunneier'],
   arr: ['Årsmøter og dugnader i Veilaget, med påmelding'],
   info: ['Vedtekter og brøyteplan fra Veilaget', 'Kontakt til Veilagets styre'],
 };

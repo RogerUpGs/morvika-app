@@ -138,7 +138,17 @@ select pg_temp.check('Veilagets styre ser påmeldingen', (select count(*) from p
 -- ---------------------------------------------------------------------
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 select pg_temp.check('grunneier ser samtalen sendt til grunneier', (select count(*) from public.messages m join public.threads t on t.id = m.thread_id where t.recipient = 'grunneier') = 1);
-select pg_temp.check('grunneier ser ikke samtalen til Veilaget', (select count(*) from public.threads where recipient = 'vei') = 0);
+select pg_temp.check('grunneier ser også samtalen til Veilaget', (select count(*) from public.threads where recipient = 'vei') = 1);
+select pg_temp.check('grunneier ser bildet i samtalen til Veilaget', (select count(*) from storage.objects where bucket_id = 'meldinger') = 2);
+insert into public.messages (thread_id, body) values ('20000000-0000-0000-0000-000000000006', 'Takk, vi ser på det.');
+insert into public.news (sender, audience, title) values ('vel', 'vel', 'Grunneier som Vel');
+insert into public.news (sender, audience, title) values ('vei', 'torpum', 'Grunneier som Veilag til Torpum');
+insert into public.alerts (level, sender, audience, title) values ('akutt', 'vei', 'vei', 'Veien er stengt');
+insert into public.events (title, starts_at, organizer, audience) values ('Dugnad på badeplassen', now() + interval '5 days', 'vel', 'morvika');
+select pg_temp.check('grunneier kan publisere som Vel og Veilag', (select count(*) from public.news where created_by = auth.uid() and sender in ('vel','vei')) = 2);
+select pg_temp.check('grunneier ser fortsatt ikke Min hytte', (select count(*) from public.cabin_ledger) = 0 and (select count(*) from public.cabin_documents) = 0);
+select pg_temp.denied('grunneier kan ikke skrive i en hyttes regnskap',
+  $$insert into public.cabin_ledger (cabin_id, description, amount) values ('10000000-0000-0000-0000-000000000047', 'Snikk', 1)$$);
 insert into public.messages (thread_id, body) values ('20000000-0000-0000-0000-000000000001', 'Det er greit.');
 select pg_temp.check('grunneier ser IKKE Min hytte-regnskap', (select count(*) from public.cabin_ledger) = 0);
 select pg_temp.check('grunneier ser IKKE Min hytte-dokumenter', (select count(*) from public.cabin_documents) = 0);
@@ -155,7 +165,10 @@ select pg_temp.denied('Trond kan ikke publisere som Veilaget',
   $$insert into public.news (sender, audience, title) values ('vei', 'vei', 'Falsk')$$);
 
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000006';
-select pg_temp.check('Per ser ikke Velets nyhet', (select count(*) from public.news where sender = 'vel') = 0);
+select pg_temp.check('Per ser ikke Velets nyheter', (select count(*) from public.news where sender = 'vel') = 0);
+select pg_temp.check('Per ser Veilagets nyhet fra grunneier til Torpum', exists (select 1 from public.news where title = 'Grunneier som Veilag til Torpum'));
+select pg_temp.check('Per ser Veilagets varsel fra grunneier', exists (select 1 from public.alerts where title = 'Veien er stengt'));
+select pg_temp.check('Per ser svaret fra grunneier i samtalen med Veilaget', (select count(*) from public.messages) = 2);
 
 -- ---------------------------------------------------------------------
 -- Uinvitert og anonym
