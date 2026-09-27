@@ -8,6 +8,7 @@ import { Icon } from '../components/Icon';
 import { PushSetup } from '../components/PushSetup';
 import { ArchiveTab } from '../components/ArchiveTab';
 import { TransferPanel } from '../components/TransferPanel';
+import { InviteCard } from '../components/InviteCard';
 
 /* ---------- Typer ---------- */
 interface AdminCabin {
@@ -463,6 +464,7 @@ function PeopleTab({ cabins, people, reload }: { cabins: AdminCabin[]; people: P
         <button className="btn primary" onClick={() => setAdding((v) => !v)}><Icon name="plus" size={18} />Legg til person uten hytte</button>
       </div>
       {adding && <AddPersonForm onDone={async () => { setAdding(false); await reload(); }} onCancel={() => setAdding(false)} />}
+      <InviteCard people={people} cabins={cabins} />
       <div className="filters">
         <input type="search" id="people-search" placeholder="Søk på navn, e-post eller hytte" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="chips" style={{ margin: 0 }}>
