@@ -49,7 +49,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const [p, r, c, f] = await Promise.all([
       supabase.rpc('my_profile').maybeSingle<Profile>(),
       supabase.from('user_roles').select('role').eq('user_id', uid),
-      supabase.from('cabin_owners').select('cabin:cabins(id,area,number,label,gnr,bnr,vel_member,vei_member,access)').eq('user_id', uid),
+      supabase.from('cabin_owners').select('cabin:cabins(id,area,number,label,gnr,bnr,vel_member,va_member,vei_member,access)').eq('user_id', uid),
       supabase.rpc('my_former_cabins'),
     ]);
     const firstError = p.error ?? r.error ?? c.error;

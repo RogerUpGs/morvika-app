@@ -8,7 +8,7 @@ import { Icon } from '../components/Icon';
 import { DraftStrip, PhotoGrid } from '../components/Media';
 import { toDrafts, uploadImages, MAX_IMAGES, type Draft } from '../lib/images';
 
-const FILTERS: [Sender | 'alle', string][] = [['alle', 'Alle'], ['grunneier', 'Grunneier'], ['vel', 'Mørvika Vel'], ['vei', 'Veilaget']];
+const FILTERS: [Sender | 'alle', string][] = [['alle', 'Alle'], ['grunneier', 'Grunneier'], ['vel', 'Mørvika Vel'], ['va', 'Vann og avløp'], ['vei', 'Veilaget']];
 const AUDIENCES = Object.keys(AUDIENCE_LABEL) as Audience[];
 
 function Badge({ s }: { s: Sender }) {
@@ -77,7 +77,7 @@ export function NewsPage() {
             ? `Oppslag fra grunneier og foreningene. Du kan publisere som ${senders.map((s) => SENDER_LABEL[s]).join(' og ')}.`
             : me.veilagOnly
               ? 'Oppslag fra Mørvikveien Veilag.'
-              : 'Oppslag fra grunneier, Velet og Veilaget som gjelder deg.'}
+              : 'Oppslag fra grunneier, Velet, Vann og avløp og Veilaget som gjelder deg.'}
         </p>
         {canPost && (
           <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

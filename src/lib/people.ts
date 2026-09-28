@@ -52,6 +52,7 @@ export function placeOf(p: Person | undefined): string {
   if (p.cabins.length) return p.cabins[0];
   if (p.roles.includes('grunneier')) return 'Grunneier';
   if (p.roles.includes('styre_vel')) return 'Styret Vel';
+  if (p.roles.includes('styre_va')) return 'Styret VA';
   if (p.roles.includes('styre_vei')) return 'Styret Veilag';
   return '';
 }

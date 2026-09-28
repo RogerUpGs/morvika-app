@@ -1,8 +1,8 @@
 export type Area = 'morvika' | 'torpum';
 export type CabinAccess = 'full' | 'veilag';
-export type AppRole = 'grunneier' | 'styre_vel' | 'styre_vei' | 'admin';
-export type Audience = 'alle' | 'morvika' | 'torpum' | 'vel' | 'vei';
-export type Sender = 'grunneier' | 'vel' | 'vei' | 'admin';
+export type AppRole = 'grunneier' | 'styre_vel' | 'styre_va' | 'styre_vei' | 'admin';
+export type Audience = 'alle' | 'morvika' | 'torpum' | 'vel' | 'va' | 'vei';
+export type Sender = 'grunneier' | 'vel' | 'va' | 'vei' | 'admin';
 
 export interface Cabin {
   id: string;
@@ -12,6 +12,7 @@ export interface Cabin {
   gnr: number | null;
   bnr: number | null;
   vel_member: boolean;
+  va_member: boolean;
   vei_member: boolean;
   /** full = vanlig hytteeier, veilag = ser bare det som kommer fra Mørvikveien Veilag (Torpum) */
   access: CabinAccess;
@@ -39,6 +40,7 @@ export interface News {
 export const ROLE_LABEL: Record<AppRole, string> = {
   grunneier: 'Grunneier',
   styre_vel: 'Styret Vel',
+  styre_va: 'Styret VA',
   styre_vei: 'Styret Veilag',
   admin: 'Administrator',
 };
@@ -46,6 +48,7 @@ export const ROLE_LABEL: Record<AppRole, string> = {
 export const SENDER_LABEL: Record<Sender, string> = {
   grunneier: 'Grunneier',
   vel: 'Mørvika Vel',
+  va: 'Mørvika Vann og Avløp',
   vei: 'Mørvikveien Veilag',
   admin: 'Administrator',
 };
@@ -55,6 +58,7 @@ export const AUDIENCE_LABEL: Record<Audience, string> = {
   morvika: 'Mørvika hytteområde',
   torpum: 'Torpum (ekstern eiendom)',
   vel: 'Medlemmer i Mørvika Vel',
+  va: 'Tilknyttet Mørvika Vann og Avløp',
   vei: 'Medlemmer i Mørvikveien Veilag',
 };
 
@@ -62,9 +66,10 @@ export const AUDIENCE_LABEL: Record<Audience, string> = {
 export function sendersFor(roles: AppRole[]): Sender[] {
   const s: Sender[] = [];
   const grunneier = roles.includes('grunneier');
-  // Grunneier har full tilgang til både Velet og Veilaget
+  // Grunneier har full tilgang til Velet, Vann og avløp og Veilaget
   if (grunneier) s.push('grunneier');
   if (grunneier || roles.includes('styre_vel')) s.push('vel');
+  if (grunneier || roles.includes('styre_va')) s.push('va');
   if (grunneier || roles.includes('styre_vei')) s.push('vei');
   if (roles.includes('admin')) s.push('admin');
   return s;

@@ -33,10 +33,10 @@ Web-app (PWA) for kommunikasjon mellom grunneier, Mørvika Vel, Mørvikveien Vei
 
 - Ingenting er åpent for anonyme brukere.
 - Bare inviterte (eier av en hytte, eller med en rolle) ser innhold.
-- Nyheter, varsler og arrangementer vises for mottakergruppen: alle, Mørvika, Torpum, Vel-medlemmer eller Veilag-medlemmer.
+- Nyheter, varsler og arrangementer vises for mottakergruppen: alle, Mørvika, Torpum, Vel-medlemmer, tilknyttet Vann og avløp eller Veilag-medlemmer.
 - Torpum (ekstern eiendom, tilgang «veilag») ser bare det som kommer fra Mørvikveien Veilag: nyheter, varsler, arrangementer, dokumenter og meldinger til Veilagets styre.
-- Meldinger ses bare av hytteeieren og mottakeren (grunneier, styret i Vel eller styret i Mørvikveien Veilag).
-- Grunneier har full tilgang til Velet og Veilaget: kan publisere, varsle og lage arrangementer for begge, og leser meldinger til begge styrene.
+- Meldinger ses bare av hytteeieren og mottakeren (grunneier, styret i Vel, styret i Mørvika Vann og Avløp eller styret i Mørvikveien Veilag).
+- Grunneier har full tilgang til Velet, Vann og avløp og Veilaget: kan publisere, varsle og lage arrangementer for alle tre, og leser meldinger til alle styrene.
 - Min hytte ses bare av hyttas eiere, og bare for hytter med full tilgang. Grunneier og administrator har ingen unntak.
 - E-post og telefonnummer er skjult for andre brukere.
 

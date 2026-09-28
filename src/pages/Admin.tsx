@@ -14,7 +14,7 @@ import { InviteCard } from '../components/InviteCard';
 interface AdminCabin {
   id: string; area: Area; number: number; label: string; address: string | null;
   gnr: number | null; bnr: number | null; fnr: number | null;
-  vel_member: boolean; vei_member: boolean; access: 'full' | 'veilag'; tomt: Tomt | null;
+  vel_member: boolean; va_member: boolean; vei_member: boolean; access: 'full' | 'veilag'; tomt: Tomt | null;
 }
 type Tomt = 'feste' | 'selveier';
 const TOMT_LABEL: Record<Tomt, string> = { feste: 'Festetomt', selveier: 'Selveiertomt' };
@@ -27,7 +27,7 @@ interface OwnerDraft { key: string; id?: string; name: string; email: string; ph
 
 const AREA_LABEL: Record<Area, string> = { morvika: 'Mørvika', torpum: 'Torpum' };
 const STATUS_LABEL: Record<PersonStatus, string> = { aktiv: 'Aktivert', venter: 'Ikke logget inn ennå', mangler_epost: 'Mangler e-post' };
-const ALL_ROLES: AppRole[] = ['grunneier', 'styre_vel', 'styre_vei', 'admin'];
+const ALL_ROLES: AppRole[] = ['grunneier', 'styre_vel', 'styre_va', 'styre_vei', 'admin'];
 const labelFor = (area: Area, n: number | '') => (n === '' ? '' : area === 'torpum' ? `Torpum ${n}` : `SB-${n}`);
 /** «SB-4 · Mørvikveien»: nummer og vei, uten husnummer (betegnelsen ser alle hytteeiere) */
 const autoLabel = (area: Area, n: number | '', address: string) => {
@@ -54,7 +54,7 @@ export function AdminPage() {
 
   const load = useCallback(async () => {
     const [c, p, n] = await Promise.all([
-      supabase.from('cabins').select('id,area,number,label,address,gnr,bnr,fnr,vel_member,vei_member,access,tomt').order('area').order('number'),
+      supabase.from('cabins').select('id,area,number,label,address,gnr,bnr,fnr,vel_member,va_member,vei_member,access,tomt').order('area').order('number'),
       supabase.rpc('admin_people'),
       supabase.from('cabin_notes').select('cabin_id,note'),
     ]);
@@ -164,7 +164,7 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
         <div className="card ledgerbox">
           <div className="tbl-wrap scrollbox">
             <table>
-              <thead><tr><th>Hytte</th><th>Eiendom</th><th>Hytteadresse</th><th>Tomt</th><th>Gnr/Bnr/Fnr</th><th>Eiere</th><th>Vel</th><th /></tr></thead>
+              <thead><tr><th>Hytte</th><th>Eiendom</th><th>Hytteadresse</th><th>Tomt</th><th>Gnr/Bnr/Fnr</th><th>Eiere</th><th>Vel</th><th>VA</th><th /></tr></thead>
               <tbody>
                 {shown.map((c) => (
                   <tr key={c.id}>
@@ -181,10 +181,11 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
                       )}
                     </td>
                     <td>{c.vel_member ? 'Ja' : '–'}</td>
+                    <td>{c.va_member ? 'Ja' : '–'}</td>
                     <td><span className="rowacts col"><button className="btn small" onClick={() => edit(c)}>Rediger</button><button className="btn small ghost" onClick={() => startTransfer(c)}>Eierskifte</button><button className="btn small ghost" onClick={() => onArchive(c.id)}>Arkiv</button></span></td>
                   </tr>
                 ))}
-                {shown.length === 0 && <tr><td colSpan={8} className="muted">Ingen treff.</td></tr>}
+                {shown.length === 0 && <tr><td colSpan={9} className="muted">Ingen treff.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -234,6 +235,7 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
   const [bnr, setBnr] = useState(editing?.bnr != null ? String(editing.bnr) : '');
   const [fnr, setFnr] = useState(editing?.fnr != null ? String(editing.fnr) : '');
   const [vel, setVel] = useState(editing ? editing.vel_member : startArea === 'morvika');
+  const [va, setVa] = useState(editing ? editing.va_member : startArea === 'morvika');
   const [tomt, setTomt] = useState<Tomt | null>(editing ? editing.tomt : defaultTomt(startArea));
   const [note, setNote] = useState(initialNote);
   const [ownerRows, setOwnerRows] = useState<OwnerDraft[]>(() => editing && owners.length
@@ -253,6 +255,7 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
     if (!editing) {
       setNumber(String(nextNumber(a)));
       setVel(a === 'morvika');
+      setVa(a === 'morvika');
       setAddress(defaultStreet(a)); setGnr(defaultGnr(a)); setTomt(defaultTomt(a));
     }
   }
@@ -278,7 +281,7 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
       area, number: n, label: shownLabel.trim() || autoLabel(area, n, address), address: address.trim() || null,
       gnr: toInt(gnr), bnr: toInt(bnr), fnr: tomt === 'selveier' ? null : toInt(fnr),
       tomt: area === 'torpum' ? null : tomt,
-      vel_member: area === 'torpum' ? false : vel, vei_member: true,
+      vel_member: area === 'torpum' ? false : vel, va_member: area === 'torpum' ? false : va, vei_member: true,
       access: area === 'torpum' ? 'veilag' : 'full',
     };
     let cabinId = editing?.id;
@@ -378,6 +381,7 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
         <div className="field">Medlemskap
           <div className="checks">
             <label className="check"><input type="checkbox" checked={area === 'torpum' ? false : vel} disabled={area === 'torpum'} onChange={(e) => setVel(e.target.checked)} /> Mørvika Vel</label>
+            <label className="check"><input type="checkbox" checked={area === 'torpum' ? false : va} disabled={area === 'torpum'} onChange={(e) => setVa(e.target.checked)} /> Vann og avløp</label>
             <label className="check"><input type="checkbox" checked disabled /> Veilaget (obligatorisk)</label>
           </div>
         </div>

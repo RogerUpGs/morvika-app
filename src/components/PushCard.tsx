@@ -70,7 +70,7 @@ export function PushSettings() {
 
   const rows: [keyof Prefs, string, string][] = [
     ['messages', 'Meldinger', 'Svar fra grunneier og styrene, og nye meldinger til deg'],
-    ['news', 'Nyheter', 'Nye oppslag fra grunneier, Velet og Veilaget'],
+    ['news', 'Nyheter', 'Nye oppslag fra grunneier, Velet, Vann og avløp og Veilaget'],
     ['events', 'Arrangementer', 'Nye arrangementer. Påminnelse dagen før får du alltid når du er påmeldt'],
     ['praten', 'Hyttepraten', 'Når noen kommenterer innlegget ditt'],
   ];

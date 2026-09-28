@@ -513,3 +513,54 @@ reset request.jwt.claim.sub;
 set role anon;
 select pg_temp.denied('anonym har ingen tilgang', $$select 1 from public.news$$);
 reset role;
+
+-- ---------------------------------------------------------------------
+-- Mørvika Vann og Avløp
+-- ---------------------------------------------------------------------
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-000000000401', 'va@example.no', '{"full_name":"Vera Vann"}');
+insert into public.user_roles values ('00000000-0000-0000-0000-000000000401', 'styre_va');
+update public.cabins set va_member = (area = 'morvika' and number <> 88);
+select count(distinct o.user_id) as va_n from public.cabin_owners o join public.cabins c on c.id = o.cabin_id where c.va_member \gset
+select pg_temp.check('Torpum er ikke medlem i Vann og avløp', not (select va_member from public.cabins where area = 'torpum' limit 1));
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000401';
+insert into public.news (sender, audience, title) values ('va', 'va', 'Vannet stenges tirsdag');
+insert into public.alerts (level, sender, audience, title) values ('akutt', 'va', 'va', 'Vannlekkasje ved pumpehuset');
+select pg_temp.denied('VA-styret kan ikke publisere som Velet', $$insert into public.news (sender, audience, title) values ('vel', 'vel', 'Feil')$$);
+select pg_temp.check('VA-styret får størrelsen på gruppen sin', public.audience_size('va') = :va_n);
+insert into public.contacts (grp, title, name) values ('va', 'Leder', 'Vera Vann');
+select pg_temp.denied('VA-styret kan ikke endre Velets kontakter', $$insert into public.contacts (grp, name) values ('vel', 'Feil')$$);
+insert into storage.objects (bucket_id, name) values ('dokumenter', 'va/vannanalyse.pdf');
+insert into public.shared_documents (title, owner, storage_path) values ('Vannanalyse', 'va', 'va/vannanalyse.pdf');
+select pg_temp.denied('VA-styret kan ikke legge filer i Velets mappe', $$insert into storage.objects (bucket_id, name) values ('dokumenter', 'vel/feil.pdf')$$);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+select pg_temp.check('medlem ser nyheten fra Vann og avløp', exists (select 1 from public.news where title = 'Vannet stenges tirsdag'));
+insert into public.threads (owner_id, recipient, subject) values ('00000000-0000-0000-0000-000000000101', 'va', 'Lavt vanntrykk');
+insert into public.messages (thread_id, author_id, body)
+  select id, '00000000-0000-0000-0000-000000000101', 'Vanntrykket er lavt i dag' from public.threads where subject = 'Lavt vanntrykk';
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000088';
+select pg_temp.check('ikke-medlem ser ikke nyheten fra Vann og avløp', not exists (select 1 from public.news where title = 'Vannet stenges tirsdag'));
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000006';
+select pg_temp.check('Torpum ser ikke Vann og avløp', not exists (select 1 from public.news where sender = 'va')
+  and not exists (select 1 from public.contacts where grp = 'va') and not exists (select 1 from public.shared_documents where owner = 'va'));
+select pg_temp.denied('Torpum kan ikke skrive til VA-styret', $$insert into public.threads (owner_id, recipient, subject) values ('00000000-0000-0000-0000-000000000006', 'va', 'Hei')$$);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.check('Velets styre ser ikke meldinger til VA-styret', not exists (select 1 from public.threads where subject = 'Lavt vanntrykk'));
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000401';
+select pg_temp.check('VA-styret ser meldingen og kan svare', exists (select 1 from public.threads where subject = 'Lavt vanntrykk'));
+insert into public.messages (thread_id, author_id, body)
+  select id, auth.uid(), 'Vi ser på det' from public.threads where subject = 'Lavt vanntrykk';
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select pg_temp.check('grunneier ser meldinger til VA-styret og kan publisere som VA',
+  exists (select 1 from public.threads where subject = 'Lavt vanntrykk') and public.can_send_as('va'));
+
+reset role;
+select pg_temp.check('push for melding til VA går til VA-styret og grunneier, ikke Velet',
+  (select array_agg(t.user_id order by t.user_id) from public.push_targets('messages', (select id from public.messages where body = 'Vanntrykket er lavt i dag')) t)
+  = array['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000401']::uuid[]);
+select pg_temp.check('akutt VA-varsel går bare til medlemmene',
+  (select count(*) from public.push_targets('alerts', (select id from public.alerts where title = 'Vannlekkasje ved pumpehuset')) t) = :va_n);

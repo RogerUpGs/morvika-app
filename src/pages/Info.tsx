@@ -6,8 +6,8 @@ import { dShort } from '../lib/format';
 import { SENDER_LABEL, sendersFor, type Sender } from '../lib/types';
 import { Icon } from '../components/Icon';
 
-type Grp = 'grunneier' | 'vel' | 'vei' | 'nyttig';
-const GRP_LABEL: Record<Grp, string> = { grunneier: 'Grunneier', vel: 'Mørvika Vel', vei: 'Mørvikveien Veilag', nyttig: 'Nyttige nummer' };
+type Grp = 'grunneier' | 'vel' | 'va' | 'vei' | 'nyttig';
+const GRP_LABEL: Record<Grp, string> = { grunneier: 'Grunneier', vel: 'Mørvika Vel', va: 'Mørvika Vann og Avløp', vei: 'Mørvikveien Veilag', nyttig: 'Nyttige nummer' };
 const CATEGORIES = ['Vedtekter', 'Referater', 'Vei og brøyting', 'Kart og tomter', 'Regler og avtaler', 'Annet'];
 
 interface Contact { id: string; grp: Grp; title: string; name: string; phone: string | null; email: string | null; note: string; sort: number }
@@ -63,8 +63,8 @@ export function InfoPage() {
     if (error) toast('Kontakten ble ikke slettet.'); else void load();
   }
 
-  const groups: Grp[] = me.veilagOnly ? ['vei', 'nyttig'] : ['grunneier', 'vel', 'vei', 'nyttig'];
-  const docOwners: Sender[] = me.veilagOnly ? ['vei'] : ['grunneier', 'vel', 'vei'];
+  const groups: Grp[] = me.veilagOnly ? ['vei', 'nyttig'] : ['grunneier', 'vel', 'va', 'vei', 'nyttig'];
+  const docOwners: Sender[] = me.veilagOnly ? ['vei'] : ['grunneier', 'vel', 'va', 'vei'];
 
   return (
     <>

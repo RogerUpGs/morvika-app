@@ -9,12 +9,14 @@ import { DraftStrip, MessagePhotos } from '../components/Media';
 import { Icon } from '../components/Icon';
 import type { AppRole } from '../lib/types';
 
-type Recipient = 'grunneier' | 'vel' | 'vei';
-export const RECIPIENT_LABEL: Record<Recipient, string> = { grunneier: 'Grunneier', vel: 'Styret i Mørvika Vel', vei: 'Styret i Mørvikveien Veilag' };
-const TO_TEXT: Record<Recipient, string> = { grunneier: 'grunneier', vel: 'styret i Mørvika Vel', vei: 'styret i Mørvikveien Veilag' };
+type Recipient = 'grunneier' | 'vel' | 'va' | 'vei';
+export const RECIPIENT_LABEL: Record<Recipient, string> = { grunneier: 'Grunneier', vel: 'Styret i Mørvika Vel', va: 'Styret i Mørvika Vann og Avløp', vei: 'Styret i Mørvikveien Veilag' };
+const TO_TEXT: Record<Recipient, string> = { grunneier: 'grunneier', vel: 'styret i Mørvika Vel', va: 'styret i Mørvika Vann og Avløp', vei: 'styret i Mørvikveien Veilag' };
+const FILTER_LABEL: Record<Recipient, string> = { grunneier: 'Til grunneier', vel: 'Til Velet', va: 'Til Vann og avløp', vei: 'Til Veilaget' };
 const RECIPIENT_HELP: Record<Recipient, string> = {
   grunneier: 'Tomt, feste, trær, grenser og byggesaker',
   vel: 'Fellesarealer, badeplass, arrangementer',
+  va: 'Vannforsyning, avløp, lekkasjer og tilkobling',
   vei: 'Vei, brøyting, grøfter og bommer',
 };
 
@@ -28,8 +30,9 @@ const snip = (m?: Message) => (m ? m.body || (m.images.length ? `Bilde (${m.imag
 /** Mottakere brukeren selv tar imot meldinger for */
 export function handles(roles: AppRole[]): Recipient[] {
   const r: Recipient[] = [];
-  if (roles.includes('grunneier')) r.push('grunneier', 'vel', 'vei'); // grunneier leser alt til styrene
+  if (roles.includes('grunneier')) r.push('grunneier', 'vel', 'va', 'vei'); // grunneier leser alt til styrene
   if (roles.includes('styre_vel') && !r.includes('vel')) r.push('vel');
+  if (roles.includes('styre_va') && !r.includes('va')) r.push('va');
   if (roles.includes('styre_vei') && !r.includes('vei')) r.push('vei');
   return r;
 }
@@ -57,7 +60,7 @@ export function MessagesPage() {
   const uid = me.session?.user.id ?? '';
   const mine = handles(me.roles);
   const canStart = me.isResident || me.veilagOnly || mine.length > 0;
-  const choices: Recipient[] = me.veilagOnly ? ['vei'] : ['grunneier', 'vel', 'vei'];
+  const choices: Recipient[] = me.veilagOnly ? ['vei'] : ['grunneier', 'vel', 'va', 'vei'];
 
   const [threads, setThreads] = useState<Thread[] | null>(null);
   const [lastMsg, setLastMsg] = useState<Record<string, Message>>({});
@@ -103,7 +106,7 @@ export function MessagesPage() {
   const shown = (threads ?? []).filter((t) => filter === 'alle' || (filter === 'mine' ? t.owner_id === uid || t.started_by === uid : t.recipient === filter && t.owner_id !== uid));
   const open = (threads ?? []).find((t) => t.id === openId) ?? null;
   const filters: ['alle' | 'mine' | Recipient, string][] = mine.length
-    ? [['alle', 'Alle'], ...mine.map((r) => [r, r === 'grunneier' ? 'Til grunneier' : r === 'vel' ? 'Til Velet' : 'Til Veilaget'] as [Recipient, string]), ['mine', 'Startet av meg']]
+    ? [['alle', 'Alle'], ...mine.map((r) => [r, FILTER_LABEL[r]] as [Recipient, string]), ['mine', 'Startet av meg']]
     : [];
 
   function markRead(id: string) {
@@ -236,7 +239,7 @@ function Conversation({ t, dir, uid, title, onBack, onSent, toast }: {
 }
 
 /* ---------- Ny samtale ---------- */
-const FROM_LABEL: Record<Recipient, string> = { grunneier: 'Grunneier', vel: 'Mørvika Vel', vei: 'Mørvikveien Veilag' };
+const FROM_LABEL: Record<Recipient, string> = { grunneier: 'Grunneier', vel: 'Mørvika Vel', va: 'Mørvika Vann og Avløp', vei: 'Mørvikveien Veilag' };
 
 function NewThread({ choices, mine, dir, uid, onCancel, onSent }: {
   choices: Recipient[]; mine: Recipient[]; dir: Directory; uid: string; onCancel: () => void; onSent: (id: string) => void;
