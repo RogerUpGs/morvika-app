@@ -1,4 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import { kr, smsParts, useSmsSettings } from '../lib/sms';
+import { SENDER_LABEL, type Sender } from '../lib/types';
 import { useMe } from '../lib/session';
 import { useToast } from '../lib/ui';
 import { Icon } from './Icon';
@@ -55,8 +58,10 @@ ${name}
 Grunneier, Mørvika`;
 
 const smsText = (area: Area) => area === 'torpum'
-  ? 'Mørvikveien Veilag har fått egen app med nyheter og varsler om veien. Gå til app.morvika.no og logg inn med e-postadressen din. Du får en kode på e-post.'
-  : 'Mørvika hytteområde har fått egen app med nyheter, varsler og Min hytte. Gå til app.morvika.no og logg inn med e-postadressen din. Du får en kode på e-post.';
+  ? 'Mørvikveien Veilag har fått app med nyheter og varsler. Legg den på hjemskjermen og logg inn med e-posten din: https://app.morvika.no/installer'
+  : area === 'morvika'
+    ? 'Mørvika hytteområde har fått egen app. Legg den på hjemskjermen og logg inn med e-posten din: https://app.morvika.no/installer'
+    : 'Mørvika har fått egen app med nyheter og varsler. Legg den på hjemskjermen og logg inn med e-posten din: https://app.morvika.no/installer';
 
 /** Administrasjon → Personer og roller: hjelp til å invitere dem som ikke har logget inn */
 export function InviteCard({ people, cabins }: { people: P[]; cabins: C[] }) {
@@ -137,13 +142,14 @@ export function InviteCard({ people, cabins }: { people: P[]; cabins: C[] }) {
         <div className="istep">
           <span className="inum">3</span>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <b>Påminnelse på SMS (valgfritt)</b>
-            <p className="muted">For dem som ikke har logget inn etter e-posten. Send fra forvaltningssystemet ditt.</p>
+            <b>Invitasjon på SMS</b>
+            <p className="muted">Lenken i SMS-en åpner veiledningen rett på telefonen. Fint som påminnelse etter e-posten, eller for dem som ikke leser e-post så ofte.</p>
             <div className="subjectline"><code style={{ whiteSpace: 'normal' }}>{smsText(area)}</code></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
               <button className="btn small" disabled={!phones.length} onClick={() => void copy(phones.map((p) => p.phone!.replace(/\s/g, '')).join(', '), `${phones.length} mobilnumre`)}>Kopier mobilnumre ({phones.length})</button>
               <button className="btn small ghost" onClick={() => void copy(smsText(area), 'SMS-teksten')}>Kopier SMS-teksten</button>
             </div>
+            <SmsInvite area={area} text={smsText(area)} />
           </div>
         </div>
       </div>
@@ -156,5 +162,60 @@ export function InviteCard({ people, cabins }: { people: P[]; cabins: C[] }) {
         </div>
       )}
     </section>
+  );
+}
+
+/** Send invitasjonen som SMS fra appen (via 46elks) */
+function SmsInvite({ area, text }: { area: Area; text: string }) {
+  const cfg = useSmsSettings();
+  const toast = useToast();
+  const [n, setN] = useState<number | null>(null);
+  const [payer, setPayer] = useState<Sender>(area === 'torpum' ? 'vei' : 'grunneier');
+  const [confirm, setConfirm] = useState(false);
+  const [result, setResult] = useState<{ status: string; sent: number; failed: number } | null>(null);
+
+  useEffect(() => {
+    setConfirm(false); setResult(null); setPayer(area === 'torpum' ? 'vei' : 'grunneier');
+    void supabase.rpc('sms_invite_preview', { p_area: area }).then(({ data }) => setN(typeof data === 'number' ? data : null));
+  }, [area]);
+
+  if (!cfg) return null;
+  if (!cfg.enabled) return <p className="muted" style={{ fontSize: 13, margin: '8px 0 0' }}>Når SMS er slått på under Administrasjon → SMS, kan du sende invitasjonen herfra.</p>;
+  const parts = smsParts(text).parts;
+
+  async function send() {
+    setConfirm(false);
+    const { data, error } = await supabase.from('sms_batches').insert({ area, sender: payer, message: text }).select('id').single();
+    if (error || !data) { toast('SMS-ene ble ikke sendt. Er databasen oppdatert?'); return; }
+    setResult({ status: 'venter', sent: 0, failed: 0 });
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const { data: b } = await supabase.from('sms_batches').select('status,sent,failed').eq('id', data.id).single();
+      if (b && b.status === 'ferdig') { setResult(b as { status: string; sent: number; failed: number }); return; }
+    }
+    setResult({ status: 'ukjent', sent: 0, failed: 0 });
+  }
+
+  return (
+    <div className="smsinvite">
+      <label className="field" htmlFor="inv-payer">Betales av
+        <select id="inv-payer" value={payer} onChange={(e) => setPayer(e.target.value as Sender)}>
+          {(['grunneier', 'vel', 'va', 'vei'] as Sender[]).map((s) => <option key={s} value={s}>{SENDER_LABEL[s]}</option>)}
+        </select>
+      </label>
+      {result ? (
+        <p className="smsline" style={{ margin: 0 }}>
+          {result.status === 'venter' ? 'Sender …'
+            : result.status === 'ukjent' ? 'Fikk ikke svar ennå. Se Administrasjon → SMS om litt.'
+            : <><b>{result.sent}</b> SMS sendt{result.failed ? `, ${result.failed} feilet (se Administrasjon → SMS)` : ''}.</>}
+        </p>
+      ) : confirm ? (
+        <span className="confirm">Sende {n} SMS{cfg.price ? ` (ca. ${kr((n ?? 0) * parts * cfg.price)})` : ''}?
+          <button className="btn small primary" onClick={() => void send()}>Ja, send</button>
+          <button className="btn small ghost" onClick={() => setConfirm(false)}>Avbryt</button></span>
+      ) : (
+        <button className="btn small primary" disabled={!n} onClick={() => setConfirm(true)}>Send SMS til {n ?? '…'} {n === 1 ? 'person' : 'personer'}</button>
+      )}
+    </div>
   );
 }

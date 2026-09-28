@@ -88,6 +88,7 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260928040000_vann_avlop_del1.sql` | Mørvika Vann og Avløp, del 1: nye verdier (kjøres først, alene) | 28. sep 2026 |
 | `20260928041000_vann_avlop_del2.sql` | Mørvika Vann og Avløp, del 2: medlemskap (alle Mørvika-hytter), styre, meldinger, kontakter, push | 28. sep 2026 |
 | `20260928050000_sms.sql` | SMS-kontakt per hytte, veinavnfilter på varsler, SMS via 46elks med logg og oppgjør | 28. sep 2026 |
+| `20260928060000_sms_invitasjon.sql` | Invitasjon på SMS til dem som ikke har logget inn | **ikke kjørt** |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 
@@ -130,3 +131,10 @@ Slik virker det:
 * Én SMS per hytte, til eieren som er merket **SMS** i hytteregisteret (den som ble registrert først). Byttes under «Rediger». Har SMS-kontakten ikke mobilnummer, går SMS-en til neste eier med mobilnummer. Samme nummer får bare én SMS.
 * Varsler kan avgrenses til veinavn. Da får bare hyttene i de veiene varselet (i appen, push og SMS).
 * Administrasjon → SMS viser hva hver avsender har sendt siden forrige oppgjør. Når regningen er betalt: skriv inn beløpet og trykk «Registrer oppgjør». Beløpet fordeles etter antall SMS-deler, og oversikten starter på null. Tidligere oppgjør ligger under «Tidligere oppgjør».
+
+## Få hytteeierne i gang
+* **app.morvika.no/installer**: veiledning med bilder for iPhone og Android, med QR-kode på PC og utskrift.
+* `docs/Installer-Morvika-appen.pdf`: samme veiledning som PDF (iPhone s. 1–2, Android s. 3–4).
+* `docs/Oppslag-Morvika-appen.pdf`: A4-oppslag med stor QR-kode til oppslagstavla/årsmøtet.
+* I appen: boksen «Legg Mørvika på hjemskjermen» vises på mobil når appen er åpnet i nettleseren (Android: knappen «Installer appen»; iPhone: stegene i Safari; Facebook/Messenger o.l.: «Åpne i Safari/Chrome»).
+* Administrasjon → Personer og roller → Inviter hytteeiere → **Send SMS** (krever `20260928060000_sms_invitasjon.sql`, SMS slått på og oppdatert Edge Function «push»).

@@ -6,6 +6,7 @@ import { Icon } from '../components/Icon';
 import { useNavItems } from '../lib/nav';
 import { useBadges } from '../lib/badges';
 import { PushPrompt } from '../components/PushCard';
+import { InstallPrompt } from '../components/InstallPrompt';
 import { sendersFor } from '../lib/types';
 import { nextEvent } from './Events';
 
@@ -62,6 +63,7 @@ export function Home({ go }: { go: (r: string) => void }) {
           <span><b>Del fra feltet</b><small>Ta et bilde, skriv noen ord og publiser i Nyheter</small></span>
         </button>
       )}
+      <InstallPrompt />
       <PushPrompt />
       <div className="tiles">
         {tiles.map((it) => (

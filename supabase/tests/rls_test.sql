@@ -675,3 +675,21 @@ insert into public.sms_tests (phone) values ('+4791111111');
 reset role;
 select pg_temp.check('test-SMS går til nummeret som er oppgitt',
   (select phone from public.sms_test_target((select id from public.sms_tests limit 1))) = '+4791111111');
+
+-- ---------------------------------------------------------------------
+-- Invitasjon på SMS
+-- ---------------------------------------------------------------------
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.sms_invite_preview('morvika') as inv_n \gset
+select pg_temp.check('invitasjon teller ventende eiere med e-post og mobil, én per nummer',
+  :inv_n = (select count(distinct public.sms_phone(q.phone)) from public.pending_people q
+             join public.pending_cabin_owners po on po.pending_id = q.id join public.cabins c on c.id = po.cabin_id
+            where q.email is not null and public.sms_phone(q.phone) is not null and c.area = 'morvika') and :inv_n > 0);
+insert into public.sms_batches (area, sender, message) values ('morvika', 'grunneier', 'Mørvika har fått egen app: https://app.morvika.no/installer');
+select pg_temp.denied('vanlig bruker kan ikke sende invitasjoner',
+  $$set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101'; insert into public.sms_batches (area, sender, message) values ('alle', 'grunneier', 'x')$$);
+reset role;
+select pg_temp.check('utsendingen gir én SMS per nummer, bare én gang',
+  (select count(*) from public.sms_batch_targets((select id from public.sms_batches limit 1))) = :inv_n
+  and not exists (select 1 from public.sms_batch_targets((select id from public.sms_batches limit 1))));

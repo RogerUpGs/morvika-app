@@ -1,3 +1,4 @@
+import { InstallPrompt } from '../components/InstallPrompt';
 import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { Icon, Logo } from '../components/Icon';
@@ -46,6 +47,7 @@ export function Login() {
     <main className="gate">
       <div className="gate-card">
         <div className="gate-brand"><Logo /><div><b>Mørvika</b><small>Hytteområde</small></div></div>
+        <InstallPrompt compact />
 
         {step === 'email' ? (
           <>
@@ -78,9 +80,7 @@ export function Login() {
           </>
         )}
 
-        {!window.matchMedia('(display-mode: standalone)').matches && !(navigator as { standalone?: boolean }).standalone && (
-          <p className="note">På mobil: legg appen på hjemskjermen <b>før</b> du logger inn. <a href="/installer">Se veiledning med bilder</a>.</p>
-        )}
+
       </div>
     </main>
   );

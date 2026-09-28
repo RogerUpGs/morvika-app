@@ -12,7 +12,8 @@ export function PushPrompt() {
   const { state, busy, enable } = usePush();
   const toast = useToast();
   const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(HIDE_KEY) === '1'; } catch { return false; } });
-  if (hidden || !(state === 'av' || state === 'ios-hjemskjerm')) return null;
+  // «ios-hjemskjerm» håndteres av InstallPrompt (legg på hjemskjermen først)
+  if (hidden || state !== 'av') return null;
   const hide = () => { setHidden(true); try { localStorage.setItem(HIDE_KEY, '1'); } catch { /* privat modus */ } };
 
   return (
@@ -20,11 +21,9 @@ export function PushPrompt() {
       <Icon name="bell" size={26} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <b>Få varsler på telefonen</b>
-        {state === 'ios-hjemskjerm'
-          ? <p>På iPhone må appen ligge på Hjem-skjermen først: trykk <b>Del</b> <span aria-hidden="true">⎋</span> nederst i Safari og velg <b>«Legg til på Hjem-skjerm»</b>. Åpne appen derfra og slå på varsler.</p>
-          : <p>Du får beskjed med en gang når det kommer et viktig varsel, et svar på en melding eller en ny nyhet.</p>}
+        <p>Du får beskjed med en gang når det kommer et viktig varsel, et svar på en melding eller en ny nyhet.</p>
         <div className="pp-actions">
-          {state === 'av' && (
+          {(
             <button className="btn primary small" disabled={busy} onClick={async () => { const e = await enable(); toast(e ?? 'Varsler er slått på.'); }}>
               {busy ? 'Slår på …' : 'Slå på varsler'}
             </button>

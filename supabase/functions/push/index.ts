@@ -85,6 +85,24 @@ async function smsForAlert(id: string) {
   return { sms: results.filter((r) => r.status === 'sendt').length, sms_failed: results.filter((r) => r.status === 'feilet').length };
 }
 
+async function smsForBatch(id: string) {
+  const { data, error } = await supa.rpc('sms_batch_targets', { p_batch: id });
+  if (error) console.error('sms_batch_targets', error.message);
+  const list = (data ?? []) as SmsTarget[];
+  const results = await pool(list, 5, (t) => sendSms(t.phone, t.message, t.sms_from));
+  if (list.length) {
+    const rows = list.map((t, k) => ({ batch_id: id, sender: t.sender, phone: t.phone, person_name: t.full_name, cabin_label: t.cabins, ...results[k] }));
+    const { error: e2 } = await supa.rpc('sms_record', { p_rows: rows });
+    if (e2) console.error('sms_record', e2.message);
+  }
+  const sent = results.filter((r) => r.status === 'sendt').length;
+  const failed = results.length - sent;
+  // Tom liste (SMS av, eller allerede sendt): bare merk som ferdig hvis den fortsatt venter
+  const upd = supa.from('sms_batches').update({ status: 'ferdig', sent, failed }).eq('id', id);
+  await (list.length ? upd : upd.eq('status', 'venter'));
+  return { sms: sent, sms_failed: failed };
+}
+
 async function smsTest(id: string) {
   const { data } = await supa.rpc('sms_test_target', { p_test: id });
   const t = ((data ?? []) as { phone: string | null; message: string; sms_from: string }[])[0];
@@ -107,6 +125,7 @@ Deno.serve(async (req) => {
   // Rydding: slett filer som databasen har lagt i storage_trash (Min hytte etter fristen ved eierskifte)
   if (table === 'storage_trash') return json(await emptyTrash());
   if (table === 'sms_tests') return json(await smsTest(id));
+  if (table === 'sms_batches') return json(await smsForBatch(id));
 
   // Varsler kan også gå som SMS (databasen avgjør om, og til hvem)
   const smsJob = table === 'alerts' ? smsForAlert(id) : Promise.resolve({});
