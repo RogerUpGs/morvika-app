@@ -89,6 +89,7 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260928041000_vann_avlop_del2.sql` | Mørvika Vann og Avløp, del 2: medlemskap (alle Mørvika-hytter), styre, meldinger, kontakter, push | 28. sep 2026 |
 | `20260928050000_sms.sql` | SMS-kontakt per hytte, veinavnfilter på varsler, SMS via 46elks med logg og oppgjør | 28. sep 2026 |
 | `20260928060000_sms_invitasjon.sql` | Invitasjon på SMS til dem som ikke har logget inn | 28. sep 2026 |
+| `20260928070000_push_rettighet.sql` | Push-funksjonen får lese push-abonnementene (retter manglende push) | **ikke kjørt** |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 

@@ -136,7 +136,8 @@ Deno.serve(async (req) => {
   if (!list.length) return json({ sent: 0, ...(await smsJob) });
 
   const byUser = new Map(list.map((t) => [t.user_id, t]));
-  const { data: subs } = await supa.from('push_subscriptions').select('id,user_id,endpoint,p256dh,auth').in('user_id', [...byUser.keys()]);
+  const { data: subs, error: subErr } = await supa.from('push_subscriptions').select('id,user_id,endpoint,p256dh,auth').in('user_id', [...byUser.keys()]);
+  if (subErr) return json({ error: `push_subscriptions: ${subErr.message}`, users: byUser.size, ...(await smsJob) }, 500);
 
   let sent = 0;
   const gone: string[] = [];
