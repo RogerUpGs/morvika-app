@@ -85,8 +85,8 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260928010000_min_hytte.sql` | Min hytte: kvittering på regnskapsposter | 27. sep 2026 |
 | `20260928020000_sb_nummer.sql` | Betegnelse «SB-12 · Mørvikveien» i stedet for «Hytte 12 · …» | 27. sep 2026 |
 | `20260928030000_eierskifte_app.sql` | Eierskifte fra appen, selgerens tilgang i 90 dager, sletting etter fristen | 27. sep 2026 |
-| `20260928040000_vann_avlop_del1.sql` | Mørvika Vann og Avløp, del 1: nye verdier (kjøres først, alene) | **ikke kjørt** |
-| `20260928041000_vann_avlop_del2.sql` | Mørvika Vann og Avløp, del 2: medlemskap (alle Mørvika-hytter), styre, meldinger, kontakter, push | **ikke kjørt** |
+| `20260928040000_vann_avlop_del1.sql` | Mørvika Vann og Avløp, del 1: nye verdier (kjøres først, alene) | 28. sep 2026 |
+| `20260928041000_vann_avlop_del2.sql` | Mørvika Vann og Avløp, del 2: medlemskap (alle Mørvika-hytter), styre, meldinger, kontakter, push | 28. sep 2026 |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 
