@@ -106,6 +106,11 @@ export function Shell() {
             <div><span className="eyebrow2">{eyebrow}</span><h1>{TITLES[view]}</h1></div>
           </div>
           <div className="persona">
+            {isPhone && view === 'hjem' && (
+              <button className="themebtn" onClick={() => go('profil')} aria-label="Min profil og varsler">
+                <Icon name="user" size={18} />Profil
+              </button>
+            )}
             <button className="themebtn" onClick={toggleTheme} aria-label={light ? 'Bytt til mørk visning' : 'Bytt til lys visning'}>
               <Icon name={light ? 'moon' : 'sun'} size={18} />{light ? 'Mørk' : 'Lys'}
             </button>
