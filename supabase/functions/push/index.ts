@@ -42,7 +42,8 @@ async function emptyTrash() {
 interface SmsResult { status: 'sendt' | 'feilet'; parts: number; cost: number | null; provider_id: string | null; error: string | null }
 
 async function sendSms(to: string, message: string, from: string): Promise<SmsResult> {
-  const user = Deno.env.get('ELKS_API_USERNAME'); const pass = Deno.env.get('ELKS_API_PASSWORD');
+  // trim(): mellomrom eller linjeskift som følger med ved innliming gir «401» hos 46elks
+  const user = Deno.env.get('ELKS_API_USERNAME')?.trim(); const pass = Deno.env.get('ELKS_API_PASSWORD')?.trim();
   if (!user || !pass) return { status: 'feilet', parts: 0, cost: null, provider_id: null, error: 'SMS er ikke satt opp: ELKS_API_USERNAME/ELKS_API_PASSWORD mangler i Supabase' };
   try {
     const res = await fetch('https://api.46elks.com/a1/sms', {
@@ -51,6 +52,7 @@ async function sendSms(to: string, message: string, from: string): Promise<SmsRe
       body: new URLSearchParams({ from, to, message }),
     });
     const text = await res.text();
+    if (res.status === 401) return { status: 'feilet', parts: 0, cost: null, provider_id: null, error: `46elks godtar ikke API-nøkkelen (401). Sjekk at ELKS_API_USERNAME (begynner på «u») og ELKS_API_PASSWORD er API-nøklene fra Account hos 46elks, ikke innloggingen din. Brukernavnet som ble brukt begynner på «${user.slice(0, 2)}» og har ${user.length} tegn.` };
     if (!res.ok) return { status: 'feilet', parts: 0, cost: null, provider_id: null, error: `46elks ${res.status}: ${text.slice(0, 200)}` };
     const r = JSON.parse(text) as { id?: string; status?: string; parts?: number; cost?: number };
     if (r.status === 'failed') return { status: 'feilet', parts: r.parts ?? 0, cost: null, provider_id: r.id ?? null, error: 'Avvist av 46elks' };
