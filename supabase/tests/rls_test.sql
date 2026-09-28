@@ -741,3 +741,32 @@ select pg_temp.check('push for privat gjøremål går bare til eieren',
   (select array_agg(t.user_id) from public.task_reminders r join public.tasks k on k.id = r.task_id and k.title = 'Min egen oppgave',
           lateral public.push_targets('task_reminders', r.id) t) = array['00000000-0000-0000-0000-000000000101']::uuid[]);
 select pg_temp.check('ingen ny påminnelse før det er tid', public.send_task_reminders() = 0);
+
+-- ---------------------------------------------------------------------
+-- FDV-mal og overlevering fra utbygger
+-- ---------------------------------------------------------------------
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000301';
+select public.my_ownership('10000000-0000-0000-0000-000000000088') as w88 \gset
+select public.set_fdv(:'w88', true);
+select pg_temp.check('FDV-malen lager album for byggetrinnene',
+  (select count(*) from public.cabin_albums where ownership_id = :'w88' and name in ('Grunnarbeid', 'Råbygg', 'Rør og elektro før lukking', 'Innvendig', 'Ferdig')) = 5
+  and (select fdv from public.ownerships where id = :'w88'));
+insert into public.cabin_documents (cabin_id, folder, name, storage_path) values ('10000000-0000-0000-0000-000000000088', 'Produktdatablad', 'Varmepumpe.pdf', :'w88' || '/dok/varmepumpe.pdf');
+insert into public.cabin_photos (cabin_id, album_id, storage_path)
+  select '10000000-0000-0000-0000-000000000088', id, :'w88' || '/foto/ror.jpg' from public.cabin_albums where ownership_id = :'w88' and name = 'Rør og elektro før lukking';
+insert into public.cabin_ledger (cabin_id, entry_date, description, category, amount, kind) values ('10000000-0000-0000-0000-000000000088', current_date, 'Byggekostnad', 'Annet', 1000, 'ut');
+select pg_temp.denied('andre kan ikke slå på FDV for hytta',
+  $$set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101'; select public.set_fdv('$$ || :'w88' || $$', false)$$);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.admin_transfer('10000000-0000-0000-0000-000000000088', current_date, 'salg',
+  '[{"name":"Kari Kjøper","email":"kjoper@example.no","phone":"912 00 000"}]'::jsonb, 'Ny hytte, overlevert med FDV', true) as tr \gset
+reset role;
+select pg_temp.check('overlevering fra utbygger: dokumenter, bilder og album følger med til kjøper',
+  (select count(*) from public.cabin_documents where ownership_id = :'w88') = 0
+  and (select count(*) from public.cabin_photos where ownership_id = :'w88') = 0
+  and (select count(*) from public.cabin_albums d join public.ownerships w on w.id = d.ownership_id where w.cabin_id = '10000000-0000-0000-0000-000000000088' and w.ends_on is null) = 5
+  and (select fdv from public.ownerships where cabin_id = '10000000-0000-0000-0000-000000000088' and ends_on is null)
+  and (select full_transfer_at is not null and from_builder from public.ownership_transfers where id = :'tr'));
+select pg_temp.check('hytteregnskapet blir igjen hos utbyggeren', (select count(*) from public.cabin_ledger where ownership_id = :'w88') = 1);

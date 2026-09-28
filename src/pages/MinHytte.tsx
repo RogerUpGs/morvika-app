@@ -8,9 +8,12 @@ import { Lightbox } from '../components/Media';
 import { Icon } from '../components/Icon';
 import type { Cabin } from '../lib/types';
 import { FormerHytte } from './FormerHytte';
+import { makeZip, uniqueName, type ZipEntry } from '../lib/zip';
 
 type Tab = 'home' | 'dok' | 'foto' | 'regn';
 const FOLDERS = ['Kontrakter', 'Forsikring', 'Tegninger', 'Kvitteringer'];
+// FDV-mal: forvaltning, drift og vedlikehold (ny hytte fra utbygger)
+const FDV_FOLDERS = ['Tegninger', 'Produktdata', 'Garantier', 'Veiledninger', 'Ferdigattest og samsvar', 'Vedlikehold', 'Kontrakter', 'Forsikring', 'Kvitteringer'];
 const CATS = ['Festeavgift', 'Vei og brøyting', 'Strøm', 'Forsikring', 'Kommunale avgifter', 'Vedlikehold', 'Innkjøp', 'Utleie', 'Annet'];
 const ARCHIVE = 'Fra grunneier';
 
@@ -48,6 +51,7 @@ export function MinHyttePage() {
   const [ledger, setLedger] = useState<Entry[]>([]);
   const [archive, setArchive] = useState<Arch[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [fdv, setFdv] = useState(false);
 
   const load = useCallback(async () => {
     if (!cabin) return;
@@ -55,13 +59,15 @@ export function MinHyttePage() {
     const o = (w as string | null) ?? null;
     setOwn(o);
     if (!o) { setLoaded(true); return; }
-    const [d, a, p, l, ar] = await Promise.all([
+    const [d, a, p, l, ar, w2] = await Promise.all([
       supabase.from('cabin_documents').select('id,folder,name,storage_path,size_bytes,created_at').eq('ownership_id', o).order('created_at', { ascending: false }),
       supabase.from('cabin_albums').select('id,name,created_at').eq('ownership_id', o).order('created_at'),
       supabase.from('cabin_photos').select('id,album_id,caption,storage_path,created_at').eq('ownership_id', o).order('created_at', { ascending: false }),
       supabase.from('cabin_ledger').select('id,entry_date,description,category,amount,kind,receipt_path').eq('ownership_id', o).order('entry_date', { ascending: false }),
       supabase.from('cabin_archive').select('id,title,category,document_date,storage_path,created_at').eq('cabin_id', cabin.id).order('created_at', { ascending: false }),
+      supabase.from('ownerships').select('fdv').eq('id', o).maybeSingle(),
     ]);
+    setFdv(Boolean((w2.data as { fdv?: boolean } | null)?.fdv));
     setDocs((d.data ?? []) as Doc[]); setAlbums((a.data ?? []) as Album[]); setPhotos((p.data ?? []) as Photo[]);
     setLedger(((l.data ?? []) as Entry[]).map((x) => ({ ...x, amount: Number(x.amount) })));
     setArchive((ar.data ?? []) as Arch[]);
@@ -86,7 +92,8 @@ export function MinHyttePage() {
     <>
       {picker}
       {tab === 'home' ? (
-        <HytteHome cabin={cabin} name={me.profile?.full_name ?? ''} docs={docs} archive={archive} photos={photos} albums={albums} ledger={ledger} go={setTab} />
+        <HytteHome cabin={cabin} name={me.profile?.full_name ?? ''} docs={docs} archive={archive} photos={photos} albums={albums} ledger={ledger} go={setTab}
+          own={own} fdv={fdv} reload={load} toast={toast} />
       ) : (
         <div className="subhead">
           <button className="crumb" onClick={() => setTab('home')}><Icon name="back" size={18} />{cabin.label}</button>
@@ -95,7 +102,7 @@ export function MinHyttePage() {
         </div>
       )}
       {!loaded && tab !== 'home' && <div className="empty">Henter …</div>}
-      {loaded && own && tab === 'dok' && <Documents cabinId={cabin.id} own={own} docs={docs} archive={archive} reload={load} toast={toast} />}
+      {loaded && own && tab === 'dok' && <Documents cabinId={cabin.id} own={own} docs={docs} archive={archive} reload={load} toast={toast} fdv={fdv} />}
       {loaded && own && tab === 'foto' && <Photos cabinId={cabin.id} own={own} albums={albums} photos={photos} reload={load} toast={toast} />}
       {loaded && own && tab === 'regn' && <Ledger cabinId={cabin.id} own={own} ledger={ledger} reload={load} toast={toast} label={cabin.label} />}
     </>
@@ -103,8 +110,9 @@ export function MinHyttePage() {
 }
 
 /* ---------- Forsiden for hytta ---------- */
-function HytteHome({ cabin, name, docs, archive, photos, albums, ledger, go }: {
+function HytteHome({ cabin, name, docs, archive, photos, albums, ledger, go, own, fdv, reload, toast }: {
   cabin: Cabin; name: string; docs: Doc[]; archive: Arch[]; photos: Photo[]; albums: Album[]; ledger: Entry[]; go: (t: Tab) => void;
+  own: string | null; fdv: boolean; reload: () => Promise<void>; toast: (m: string) => void;
 }) {
   const yr = new Date().getFullYear();
   const thisYr = ledger.filter((x) => x.entry_date.startsWith(String(yr)));
@@ -148,19 +156,90 @@ function HytteHome({ cabin, name, docs, archive, photos, albums, ledger, go }: {
           <span className="go">Åpne <Icon name="chev" size={16} /></span>
         </button>
       </div>
+      <FdvBar cabin={cabin} own={own} fdv={fdv} docs={docs} archive={archive} photos={photos} albums={albums} reload={reload} toast={toast} />
     </>
   );
 }
 
-/* ---------- Dokumentregister ---------- */
-function Documents({ cabinId, own, docs, archive, reload, toast }: {
-  cabinId: string; own: string; docs: Doc[]; archive: Arch[]; reload: () => Promise<void>; toast: (m: string) => void;
+/* ---------- FDV-mal og nedlasting av alt ---------- */
+function FdvBar({ cabin, own, fdv, docs, archive, photos, albums, reload, toast }: {
+  cabin: Cabin; own: string | null; fdv: boolean; docs: Doc[]; archive: Arch[]; photos: Photo[]; albums: Album[];
+  reload: () => Promise<void>; toast: (m: string) => void;
 }) {
-  const custom = [...new Set(docs.map((d) => d.folder))].filter((f) => !FOLDERS.includes(f));
+  const [progress, setProgress] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState(false);
+  const total = docs.length + archive.length + photos.length;
+
+  async function turnOn() {
+    if (!own) return;
+    setConfirm(false);
+    const { error } = await supabase.rpc('set_fdv', { p_ownership: own, p_on: true });
+    if (error) { toast('FDV-malen ble ikke slått på. Er databasen oppdatert?'); return; }
+    toast('FDV-malen er på: nye mapper i Dokumentregister og album for byggetrinnene.');
+    await reload();
+  }
+
+  async function downloadAll() {
+    const files: { bucket: string; path: string; folder: string; name: string; date: string }[] = [
+      ...docs.map((d) => ({ bucket: 'hytte', path: d.storage_path, folder: `Dokumenter/${d.folder}`, name: d.name, date: d.created_at })),
+      ...archive.map((a) => ({ bucket: 'arkiv', path: a.storage_path, folder: 'Dokumenter/Fra grunneier', name: `${a.title}.${(a.storage_path.split('.').pop() || 'pdf')}`, date: a.created_at })),
+      ...photos.map((p, i) => {
+        const al = albums.find((a) => a.id === p.album_id)?.name ?? 'Uten album';
+        const e = (p.storage_path.split('.').pop() || 'jpg').slice(0, 4);
+        return { bucket: 'hytte', path: p.storage_path, folder: `Bilder/${al}`, name: `${p.caption ? p.caption.slice(0, 60) : `Bilde ${photos.length - i}`}.${e}`, date: p.created_at };
+      }),
+    ];
+    const used = new Set<string>(); const entries: ZipEntry[] = []; let failed = 0;
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      setProgress(`Henter ${i + 1} av ${files.length} …`);
+      const { data, error } = await supabase.storage.from(f.bucket).download(f.path);
+      if (error || !data) { failed++; continue; }
+      entries.push({ name: uniqueName(used, f.folder, f.name), data: new Uint8Array(await data.arrayBuffer()), date: new Date(f.date) });
+    }
+    setProgress('Lager ZIP-fil …');
+    const blob = makeZip(entries);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${cabin.label.replace(/[\\/:*?"<>|·]+/g, '').replace(/\s+/g, ' ').trim()} – FDV og bilder.zip`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+    setProgress(null);
+    toast(failed ? `ZIP-filen er lastet ned, men ${failed} filer kunne ikke hentes.` : `ZIP-filen med ${entries.length} filer er lastet ned.`);
+  }
+
+  return (
+    <section className="card fdvbar">
+      <div className="fdvtxt">
+        <b>{fdv ? 'FDV-dokumentasjon' : 'Last ned alt'}</b>
+        <span className="muted">{fdv
+          ? 'Mapper for tegninger, produktdata, garantier, veiledninger, ferdigattest og samsvarserklæringer, og album for byggetrinnene.'
+          : 'Alle dokumenter og bilder som én ZIP-fil, med mappene og albumene slik de ligger her.'}</span>
+      </div>
+      <div className="fdvacts">
+        <button className="btn primary small" disabled={!total || progress !== null} onClick={() => void downloadAll()}>
+          <Icon name="upload" size={16} />{progress ?? `Last ned alt (${total})`}
+        </button>
+        {!fdv && own && (confirm ? (
+          <span className="confirm">Legge til FDV-mapper og album for byggetrinn?
+            <button className="btn small" onClick={() => void turnOn()}>Ja</button>
+            <button className="btn small ghost" onClick={() => setConfirm(false)}>Avbryt</button></span>
+        ) : <button className="btn small ghost" onClick={() => setConfirm(true)}>Bruk FDV-mal</button>)}
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Dokumentregister ---------- */
+function Documents({ cabinId, own, docs, archive, reload, toast, fdv }: {
+  cabinId: string; own: string; docs: Doc[]; archive: Arch[]; reload: () => Promise<void>; toast: (m: string) => void; fdv: boolean;
+}) {
+  const BASE = fdv ? FDV_FOLDERS : FOLDERS;
+  const custom = [...new Set(docs.map((d) => d.folder))].filter((f) => !BASE.includes(f));
   const [extra, setExtra] = useState<string[]>([]);
-  const folders = [...FOLDERS, ...custom, ...extra.filter((f) => !custom.includes(f))];
+  const folders = [...BASE, ...custom, ...extra.filter((f) => !custom.includes(f))];
   const [folder, setFolder] = useState<string>('Alle');
-  const [target, setTarget] = useState(FOLDERS[0]);
+  const [target, setTarget] = useState(BASE[0]);
   const [busy, setBusy] = useState('');
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);

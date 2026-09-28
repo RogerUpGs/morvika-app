@@ -5,8 +5,9 @@ import { dLong } from '../lib/format';
 import { Icon } from './Icon';
 
 type Kind = 'salg' | 'familie';
+type Mode = Kind | 'utbygger';
 interface Row { key: string; name: string; email: string; phone: string }
-interface Hist { id: string; transfer_date: string; kind: Kind; sellers: string; access_until: string | null; full_transfer_at: string | null; note: string }
+interface Hist { id: string; transfer_date: string; kind: Kind; sellers: string; access_until: string | null; full_transfer_at: string | null; note: string; from_builder?: boolean }
 
 const newRow = (): Row => ({ key: Math.random().toString(36).slice(2), name: '', email: '', phone: '' });
 const emailOk = (e: string) => e.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
@@ -20,7 +21,8 @@ export function TransferPanel({ cabin, sellers, onDone, onClose }: {
   onDone: () => Promise<void>; onClose: () => void;
 }) {
   const toast = useToast();
-  const [kind, setKind] = useState<Kind>('salg');
+  const [mode, setMode] = useState<Mode>('salg');
+  const kind: Kind = mode === 'familie' ? 'familie' : 'salg';
   const [date, setDate] = useState(today());
   const [rows, setRows] = useState<Row[]>([newRow()]);
   const [note, setNote] = useState('');
@@ -50,7 +52,7 @@ export function TransferPanel({ cabin, sellers, onDone, onClose }: {
   async function submit() {
     setBusy(true);
     const { error } = await supabase.rpc('admin_transfer', {
-      p_cabin: cabin.id, p_date: date, p_kind: kind, p_note: note.trim(),
+      p_cabin: cabin.id, p_date: date, p_kind: kind, p_note: note.trim(), p_builder: mode === 'utbygger',
       p_owners: buyers.map((r) => ({ name: r.name.trim(), email: r.email.trim(), phone: r.phone.trim() })),
     });
     setBusy(false);
@@ -67,9 +69,10 @@ export function TransferPanel({ cabin, sellers, onDone, onClose }: {
         <button type="button" className="btn small ghost" onClick={onClose}>Avbryt</button>
       </div>
 
-      <div className="seg" role="radiogroup" aria-label="Type eierskifte">
-        <button type="button" role="radio" aria-checked={kind === 'salg'} className={kind === 'salg' ? 'on' : ''} onClick={() => setKind('salg')}>Salg<small>Ny eier starter med tom Min hytte</small></button>
-        <button type="button" role="radio" aria-checked={kind === 'familie'} className={kind === 'familie' ? 'on' : ''} onClick={() => setKind('familie')}>Overdragelse i familien<small>Selger kan gi hele Min hytte videre</small></button>
+      <div className="seg three3" role="radiogroup" aria-label="Type eierskifte">
+        <button type="button" role="radio" aria-checked={mode === 'salg'} className={mode === 'salg' ? 'on' : ''} onClick={() => setMode('salg')}>Salg<small>Ny eier starter med tom Min hytte</small></button>
+        <button type="button" role="radio" aria-checked={mode === 'familie'} className={mode === 'familie' ? 'on' : ''} onClick={() => setMode('familie')}>Overdragelse i familien<small>Selger kan gi hele Min hytte videre</small></button>
+        <button type="button" role="radio" aria-checked={mode === 'utbygger'} className={mode === 'utbygger' ? 'on' : ''} onClick={() => setMode('utbygger')}>Overlevering fra utbygger<small>Dokumenter, bilder og FDV følger med til kjøper</small></button>
       </div>
 
       <fieldset>
@@ -116,8 +119,9 @@ export function TransferPanel({ cabin, sellers, onDone, onClose }: {
         <b>Dette skjer:</b>
         <ul>
           <li>{sellers.length ? sellers.map((s) => s.full_name).join(' og ') : 'Tidligere eiere'} slutter å være eiere{active.length ? ` og kan lese og laste ned Min hytte til ${dLong(plus90(date))}. Etter det slettes det` : ''}.</li>
-          <li>{buyers.length ? buyers.map((b) => b.name.trim()).join(' og ') : 'Ny eier'} blir eier{buyers.length > 1 ? 'e' : ''} fra {dLong(date)} og starter med tom Min hytte. De får tilgang første gang de logger inn med e-posten sin.</li>
-          <li>{kind === 'salg' ? 'Selgeren kan velge dokumenter og bilder som skal følge hytta.' : 'Selgeren kan velge enkeltting eller gi hele Min hytte videre («Overfør alt»).'}</li>
+          <li>{buyers.length ? buyers.map((b) => b.name.trim()).join(' og ') : 'Ny eier'} blir eier{buyers.length > 1 ? 'e' : ''} fra {dLong(date)} og {mode === 'utbygger' ? 'får dokumentene og bildene i Min hytte' : 'starter med tom Min hytte'}. De får tilgang første gang de logger inn med e-posten sin.</li>
+          <li>{mode === 'utbygger' ? 'Alle dokumenter, bilder og album (FDV-dokumentasjonen) flyttes til kjøper med en gang. Hytteregnskapet blir ikke med.'
+            : mode === 'salg' ? 'Selgeren kan velge dokumenter og bilder som skal følge hytta.' : 'Selgeren kan velge enkeltting eller gi hele Min hytte videre («Overfør alt»).'}</li>
           <li>Hyttearkivet (festekontrakt o.l.) følger hytta til ny eier.</li>
         </ul>
       </div>
@@ -137,8 +141,8 @@ export function TransferPanel({ cabin, sellers, onDone, onClose }: {
           <legend>Tidligere eierskifter</legend>
           <ul className="histlist">
             {hist.map((h) => (
-              <li key={h.id}><b>{dLong(h.transfer_date)}</b> · {h.kind === 'salg' ? 'Salg' : 'Overdragelse i familien'}{h.sellers ? ` fra ${h.sellers}` : ''}
-                {h.full_transfer_at && <span className="pill" style={{ marginLeft: 6 }}>Alt overført</span>}
+              <li key={h.id}><b>{dLong(h.transfer_date)}</b> · {h.from_builder ? 'Overlevering fra utbygger' : h.kind === 'salg' ? 'Salg' : 'Overdragelse i familien'}{h.sellers ? ` fra ${h.sellers}` : ''}
+                {h.full_transfer_at && <span className="pill" style={{ marginLeft: 6 }}>{h.from_builder ? 'FDV overlevert' : 'Alt overført'}</span>}
                 {h.note && <div className="muted" style={{ fontSize: 13 }}>{h.note}</div>}</li>
             ))}
           </ul>

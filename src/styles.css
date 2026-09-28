@@ -286,7 +286,7 @@ button.album.new{cursor:pointer}
 .folder.on{border-color:var(--primary);background:var(--primary-soft)}
 .folder .fi{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:var(--surface-2);color:var(--link);flex:none}
 .folder.on .fi{background:var(--primary);color:var(--primary-ink)}
-.folder b{display:block;font-size:15px;font-weight:600}
+.folder b{display:block;font-size:15px;font-weight:600;overflow-wrap:anywhere;hyphens:auto}
 .folder small{display:block;font-size:13px;color:var(--muted)}
 .dropzone{display:flex;flex-wrap:wrap;align-items:center;gap:16px 20px;padding:22px 24px;margin-bottom:24px;border:2px dashed var(--line-2);border-radius:14px;background:var(--inset)}
 .dropzone.over{border-color:var(--primary);background:var(--primary-soft)}
@@ -733,3 +733,11 @@ tr.editing td{background:var(--primary-soft)}
 .taskacts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
 .taskacts .snooze{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}
 .tasknotice{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--muted);background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin:0 0 16px}
+
+/* ---------- FDV ---------- */
+.fdvbar{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:16px}
+.fdvbar .fdvtxt{flex:1;min-width:240px}
+.fdvbar .fdvtxt b{display:block;margin-bottom:2px}
+.fdvbar .fdvtxt .muted{font-size:14px}
+.fdvbar .fdvacts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.seg.three3{grid-template-columns:repeat(3,minmax(0,1fr))}
