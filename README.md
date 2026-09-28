@@ -39,6 +39,7 @@ Web-app (PWA) for kommunikasjon mellom grunneier, Mørvika Vel, Mørvikveien Vei
 - Grunneier har full tilgang til Velet, Vann og avløp og Veilaget: kan publisere, varsle og lage arrangementer for alle tre, og leser meldinger til alle styrene.
 - Min hytte ses bare av hyttas eiere, og bare for hytter med full tilgang. Grunneier og administrator har ingen unntak.
 - E-post og telefonnummer er skjult for andre brukere.
+- Akutte og viktige varsler kan også sendes som SMS (46elks), én per hytte til hyttas SMS-kontakt. Varsler kan avgrenses til veinavn. SMS-loggen med mobilnumre ser bare grunneier og administrator; styrene ser antall.
 
 ## Eierskifte
 

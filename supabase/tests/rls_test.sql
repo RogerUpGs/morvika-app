@@ -564,3 +564,114 @@ select pg_temp.check('push for melding til VA går til VA-styret og grunneier, i
   = array['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000401']::uuid[]);
 select pg_temp.check('akutt VA-varsel går bare til medlemmene',
   (select count(*) from public.push_targets('alerts', (select id from public.alerts where title = 'Vannlekkasje ved pumpehuset')) t) = :va_n);
+
+-- ---------------------------------------------------------------------
+-- SMS-kontakt, veinavn og SMS
+-- ---------------------------------------------------------------------
+reset role;
+insert into public.cabins (id, area, number, label, address, vel_member, va_member, vei_member) values
+  ('20000000-0000-0000-0000-000000000201', 'morvika', 201, 'SB-201 · Mørvikåsen',  'Mørvikåsen 5',   true, true, true),
+  ('20000000-0000-0000-0000-000000000202', 'morvika', 202, 'SB-202 · Mørvikvarden', 'Mørvikvarden 3 B', true, true, true),
+  ('20000000-0000-0000-0000-000000000203', 'morvika', 203, 'SB-203 · Mørvikvarden', null,             true, false, true);
+select pg_temp.check('veinavn hentes fra adressen, ellers fra betegnelsen',
+  public.street_of('Mørvikvarden 3 B', 'x') = 'Mørvikvarden' and public.street_of(null, 'SB-203 · Mørvikvarden') = 'Mørvikvarden'
+  and public.street_of('Mørvikåsen', null) = 'Mørvikåsen' and public.street_of(null, 'SB-9') is null);
+select pg_temp.check('mobilnummer gjøres om til +47',
+  public.sms_phone('912 34 567') = '+4791234567' and public.sms_phone('0047 41234567') = '+4741234567'
+  and public.sms_phone('+46 70 123 45 67') = '+46701234567' and public.sms_phone('123') is null and public.sms_phone(null) is null);
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.admin_add_owner('20000000-0000-0000-0000-000000000201', 'Første Eier', 'forste@example.no', '911 11 111');
+select public.admin_add_owner('20000000-0000-0000-0000-000000000201', 'Kona Eier', 'kona@example.no', '922 22 222');
+select public.admin_add_owner('20000000-0000-0000-0000-000000000201', 'Barnet Eier', 'barn@example.no', '933 33 333');
+select public.admin_add_owner('20000000-0000-0000-0000-000000000202', 'Uten Mobil', 'utenmobil@example.no', null);
+select public.admin_add_owner('20000000-0000-0000-0000-000000000202', 'Med Mobil', 'medmobil@example.no', '944 44 444');
+select public.admin_add_owner('20000000-0000-0000-0000-000000000203', 'Varden Tre', 'tre@example.no', '911 11 111');
+select pg_temp.check('den første som registreres på hytta blir SMS-kontakt',
+  (select array_agg(full_name) from public.admin_people() where '20000000-0000-0000-0000-000000000201' = any (sms_cabin_ids)) = array['Første Eier']);
+select pg_temp.check('hver hytte har én SMS-kontakt',
+  (select count(*) from public.admin_people() where '20000000-0000-0000-0000-000000000202' = any (sms_cabin_ids)) = 1);
+
+select id as kona from public.pending_people where email = 'kona@example.no' \gset
+select public.admin_set_sms_contact('20000000-0000-0000-0000-000000000201', :'kona');
+select pg_temp.check('administrator kan bytte SMS-kontakt',
+  (select array_agg(full_name) from public.admin_people() where '20000000-0000-0000-0000-000000000201' = any (sms_cabin_ids)) = array['Kona Eier']);
+
+-- Kona logger inn: hun er fortsatt SMS-kontakt, og står fortsatt som nr. 2 i rekkefølgen
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values ('00000000-0000-0000-0000-000000000501', 'kona@example.no', '{}');
+select pg_temp.check('SMS-kontakten følger med ved første innlogging',
+  (select sms_contact from public.cabin_owners where user_id = '00000000-0000-0000-0000-000000000501') = true
+  and not exists (select 1 from public.pending_cabin_owners where cabin_id = '20000000-0000-0000-0000-000000000201' and sms_contact));
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.admin_remove_owner('20000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000000501');
+select pg_temp.check('fjernes SMS-kontakten, tar den første av de andre over',
+  (select array_agg(full_name) from public.admin_people() where '20000000-0000-0000-0000-000000000201' = any (sms_cabin_ids)) = array['Første Eier']);
+select pg_temp.denied('vanlig bruker kan ikke bytte SMS-kontakt', $$set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101'; select public.admin_set_sms_contact('20000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000000501')$$);
+
+-- Veinavn og forhåndsvisning (grunneier)
+select pg_temp.check('veilisten viser veiene i gruppen med antall hytter',
+  (select cabins from public.street_list('va', 'va') where street = 'Mørvikvarden') = 1
+  and (select cabins from public.street_list('grunneier', 'morvika') where street = 'Mørvikvarden') = 2);
+select pg_temp.check('forhåndsvisning: én SMS per hytte, til SMS-kontakten',
+  (select recipients from public.sms_preview('grunneier', 'morvika', array['Mørvikåsen'])) = 1);
+select pg_temp.check('samme mobilnummer får bare én SMS, og hytter uten mobil telles',
+  (select row(recipients, cabins, without_phone)::text from public.sms_preview('grunneier', 'morvika', array['Mørvikåsen', 'Mørvikvarden'])) = '(2,3,0)');
+select pg_temp.fails('SMS kan ikke sendes for varsler til orientering',
+  $$insert into public.alerts (level, sender, audience, title, sms) values ('info', 'grunneier', 'alle', 'x', true)$$);
+
+insert into public.alerts (level, sender, audience, title, body, streets, sms)
+  values ('akutt', 'grunneier', 'morvika', 'Vannet stengt', 'Rørbrudd ved pumpehuset.', array['Mørvikåsen', 'Mørvikvarden'], true);
+insert into public.alerts (level, sender, audience, title, streets, sms)
+  values ('viktig', 'va', 'va', 'Vannprøve', array['Mørvikvarden'], true);
+
+-- Varsel med veinavn ses bare av hytteeiere i de veiene
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+select pg_temp.check('hytteeier i en annen vei ser ikke varselet', not exists (select 1 from public.alerts where title = 'Vannet stengt'));
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000401';
+select pg_temp.check('VA-styret ser sitt eget varsel selv uten hytte i veien', exists (select 1 from public.alerts where title = 'Vannprøve'));
+select pg_temp.check('styret ser ikke SMS-loggen med mobilnumre', (select count(*) from public.sms_log) = 0);
+
+reset role;
+select pg_temp.check('push for varsel med veinavn går bare til eiere i veiene',
+  not exists (select 1 from public.push_targets('alerts', (select id from public.alerts where title = 'Vannet stengt')) t
+               where t.user_id not in (select o.user_id from public.cabin_owners o where o.cabin_id::text like '20000000%')));
+select pg_temp.check('ingen SMS når SMS er slått av', not exists (select 1 from public.sms_targets((select id from public.alerts where title = 'Vannet stengt'))));
+delete from public.push_log where table_name = 'sms';
+update public.app_settings set value = 'true' where key = 'sms_enabled';
+select pg_temp.check('SMS-mottakere: kontaktpersonen, ellers første med mobil, likt nummer én gang',
+  (select array_agg(phone order by phone) from public.sms_targets((select id from public.alerts where title = 'Vannet stengt')))
+  = array['+4791111111', '+4794444444']);
+select pg_temp.check('samme varsel gir aldri SMS to ganger', not exists (select 1 from public.sms_targets((select id from public.alerts where title = 'Vannet stengt'))));
+select pg_temp.check('SMS-teksten lages av varselet',
+  (select message from public.sms_targets((select id from public.alerts where title = 'Vannprøve')) limit 1) = 'Mørvika Vann og Avløp: Vannprøve');
+
+select public.sms_record(jsonb_build_array(
+  jsonb_build_object('alert_id', (select id from public.alerts where title = 'Vannet stengt'), 'sender', 'grunneier', 'phone', '+4791111111', 'status', 'sendt', 'parts', 1, 'cost', 0.35),
+  jsonb_build_object('alert_id', (select id from public.alerts where title = 'Vannet stengt'), 'sender', 'grunneier', 'phone', '+4794444444', 'status', 'sendt', 'parts', 2, 'cost', 0.70),
+  jsonb_build_object('alert_id', (select id from public.alerts where title = 'Vannprøve'), 'sender', 'va', 'phone', '+4791111111', 'status', 'sendt', 'parts', 1, 'cost', 0.35),
+  jsonb_build_object('alert_id', (select id from public.alerts where title = 'Vannprøve'), 'sender', 'va', 'phone', '+4799999999', 'status', 'feilet', 'error', 'ugyldig')));
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000401';
+select pg_temp.check('VA-styret ser bare sitt eget forbruk', (select array_agg(sender::text) from public.sms_usage()) = array['va']);
+select pg_temp.check('VA-styret ser SMS-status på sitt varsel',
+  (select row(sent, failed)::text from public.sms_alert_status(array[(select id from public.alerts where title = 'Vannprøve')])) = '(1,1)');
+select pg_temp.denied('styret kan ikke registrere oppgjør', $$select public.sms_settle(100, '')$$);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select pg_temp.check('grunneier ser forbruket til alle',
+  (select string_agg(sender || ':' || sms || '/' || parts || '/' || failed, ',' order by sender) from public.sms_usage()) = 'grunneier:2/3/0,va:1/1/1');
+select public.sms_settle(100, 'Faktura 46elks oktober') as sid \gset
+select pg_temp.check('oppgjøret fordeler regningen etter SMS-deler',
+  (select breakdown from public.sms_settlements where id = :'sid') @> '[{"sender":"grunneier","amount":75.00},{"sender":"va","amount":25.00}]');
+select pg_temp.check('etter oppgjør starter oversikten på null, historikken beholdes',
+  not exists (select 1 from public.sms_usage()) and (select count(*) from public.sms_log where settlement_id = :'sid') = 4);
+select pg_temp.fails('oppgjør uten nye SMS gir feil', $$select public.sms_settle(10, '')$$);
+
+insert into public.sms_tests (phone) values ('+4791111111');
+reset role;
+select pg_temp.check('test-SMS går til nummeret som er oppgitt',
+  (select phone from public.sms_test_target((select id from public.sms_tests limit 1))) = '+4791111111');

@@ -676,3 +676,24 @@ tr.editing td{background:var(--primary-soft)}
 .invitetext{min-height:320px;font-size:14px;line-height:1.5}
 .noemail{margin-top:18px;padding:12px 14px;border-radius:10px;border:1px solid color-mix(in srgb,var(--danger) 45%,var(--line));font-size:14px}
 .noemail ul{margin:6px 0 8px;padding-left:18px}
+
+/* ---------- SMS ---------- */
+.pill.smspill{color:var(--s-grunn);border-color:color-mix(in srgb,var(--s-grunn) 50%,transparent);margin-left:4px;font-weight:600}
+.smspick{font-size:13px;white-space:nowrap}
+.streetpick{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.streetpick .chip small{opacity:.7;margin-left:4px}
+.smsbox{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface)}
+.smsbox.on{border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
+.smsbox .smshead{display:flex;align-items:flex-start;gap:10px}
+.smsbox .smshead b{display:block}
+.smsbox textarea{min-height:70px;margin-top:10px}
+.smscount{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px;margin-top:6px}
+.smsbox .warn{color:var(--danger)}
+.smsset .full{grid-column:1/-1}
+.smsline{font-size:13px;color:var(--muted)}
+.smsline b{color:var(--ink)}
+.usage td.r,.usage th.r{text-align:right}
+.settlehist details{border-top:1px solid var(--line);padding:10px 0}
+.settlehist summary{cursor:pointer;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.smssteps{margin:0;padding-left:20px;display:grid;gap:6px}
+.smsset{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px;align-items:end}

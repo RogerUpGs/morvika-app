@@ -7,6 +7,7 @@ import { ROLE_LABEL, type AppRole, type Area } from '../lib/types';
 import { Icon } from '../components/Icon';
 import { PushSetup } from '../components/PushSetup';
 import { ArchiveTab } from '../components/ArchiveTab';
+import { SmsTab } from '../components/SmsTab';
 import { TransferPanel } from '../components/TransferPanel';
 import { InviteCard } from '../components/InviteCard';
 
@@ -22,6 +23,8 @@ type PersonStatus = 'aktiv' | 'venter' | 'mangler_epost';
 interface Person {
   id: string; status: PersonStatus; full_name: string; email: string | null; phone: string | null;
   roles: AppRole[]; cabin_ids: string[]; last_seen_at: string | null; created_at: string;
+  /** Hytter der personen får SMS-varsler (én per hytte) */
+  sms_cabin_ids?: string[];
 }
 interface OwnerDraft { key: string; id?: string; name: string; email: string; phone: string; status?: PersonStatus }
 
@@ -39,13 +42,15 @@ const newKey = () => Math.random().toString(36).slice(2);
 const toInt = (v: string) => (v.trim() === '' ? null : Number.parseInt(v, 10));
 const emailOk = (e: string) => e.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
+const isSms = (p: Person, cabinId: string) => (p.sms_cabin_ids ?? []).includes(cabinId);
+
 function StatusPill({ s }: { s: PersonStatus }) {
   return <span className={`pill st-${s}`}>{STATUS_LABEL[s]}</span>;
 }
 
 /* ---------- Hovedside ---------- */
 export function AdminPage() {
-  const [tab, setTab] = useState<'hytter' | 'personer' | 'arkiv' | 'oppsett'>('hytter');
+  const [tab, setTab] = useState<'hytter' | 'personer' | 'arkiv' | 'sms' | 'oppsett'>('hytter');
   const [archiveCabin, setArchiveCabin] = useState<string | null>(null);
   const [cabins, setCabins] = useState<AdminCabin[] | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
@@ -72,11 +77,13 @@ export function AdminPage() {
         <button role="tab" aria-selected={tab === 'hytter'} className={tab === 'hytter' ? 'on' : ''} onClick={() => setTab('hytter')}>Hytter og eiere</button>
         <button role="tab" aria-selected={tab === 'personer'} className={tab === 'personer' ? 'on' : ''} onClick={() => setTab('personer')}>Personer og roller</button>
         <button role="tab" aria-selected={tab === 'arkiv'} className={tab === 'arkiv' ? 'on' : ''} onClick={() => setTab('arkiv')}>Hyttearkiv</button>
+        <button role="tab" aria-selected={tab === 'sms'} className={tab === 'sms' ? 'on' : ''} onClick={() => setTab('sms')}>SMS</button>
         <button role="tab" aria-selected={tab === 'oppsett'} className={tab === 'oppsett' ? 'on' : ''} onClick={() => setTab('oppsett')}>Oppsett</button>
       </div>
       {tab === 'oppsett' && <PushSetup />}
-      {tab !== 'oppsett' && err && <div className="empty">{err} <button className="linkbtn2" onClick={() => void load()}>Prøv igjen</button></div>}
-      {tab !== 'oppsett' && !err && cabins === null && <div className="empty">Henter registeret …</div>}
+      {tab === 'sms' && <SmsTab />}
+      {tab !== 'oppsett' && tab !== 'sms' && err && <div className="empty">{err} <button className="linkbtn2" onClick={() => void load()}>Prøv igjen</button></div>}
+      {tab !== 'oppsett' && tab !== 'sms' && !err && cabins === null && <div className="empty">Henter registeret …</div>}
       {!err && cabins !== null && tab === 'hytter' && <CabinsTab cabins={cabins} people={people} notes={notes} reload={load} onArchive={(id) => { setArchiveCabin(id); setTab('arkiv'); }} />}
       {!err && cabins !== null && tab === 'arkiv' && <ArchiveTab cabins={cabins} initialCabin={archiveCabin} onChanged={() => {}}
         owners={Object.fromEntries(cabins.map((c) => [c.id, people.filter((p) => p.cabin_ids.includes(c.id)).map((p) => p.full_name)]))} />}
@@ -95,7 +102,9 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
   const [showQuick, setShowQuick] = useState(true);
   const formRef = useRef<HTMLDivElement>(null);
 
-  const ownersOf = useCallback((cabinId: string) => people.filter((p) => p.cabin_ids.includes(cabinId)), [people]);
+  // SMS-kontakten først, så de andre
+  const ownersOf = useCallback((cabinId: string) => people.filter((p) => p.cabin_ids.includes(cabinId))
+    .sort((a, b) => Number(isSms(b, cabinId)) - Number(isSms(a, cabinId))), [people]);
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase();
     return cabins.filter((c) => (area === 'alle' || c.area === area) && (tomt === 'alle' || c.tomt === tomt) && (!s
@@ -176,7 +185,7 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
                     <td>
                       {ownersOf(c.id).length === 0 ? <span className="muted">Ingen eier</span> : (
                         <div className="ownerlist">
-                          {ownersOf(c.id).map((o) => <div key={o.id}>{o.full_name} <StatusPill s={o.status} /></div>)}
+                          {ownersOf(c.id).map((o) => <div key={o.id}>{o.full_name} <StatusPill s={o.status} />{isSms(o, c.id) && <span className="pill smspill" title={o.phone ? `SMS-varsler går til ${o.phone}` : 'Får SMS, men mangler mobilnummer'}>SMS{o.phone ? '' : ' · mangler mobil'}</span>}</div>)}
                         </div>
                       )}
                     </td>
@@ -242,6 +251,8 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
     ? owners.map((o) => ({ key: o.id, id: o.id, name: o.full_name, email: o.email ?? '', phone: o.phone ?? '', status: o.status }))
     : [{ key: newKey(), name: '', email: '', phone: '' }]);
   const [removed, setRemoved] = useState<string[]>([]);
+  const initialSms = editing ? owners.find((o) => isSms(o, editing.id))?.id ?? null : null;
+  const [smsId, setSmsId] = useState<string | null>(initialSms);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const numberRef = useRef<HTMLInputElement>(null);
@@ -315,6 +326,10 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
         const { error: e5 } = await supabase.rpc('admin_add_owner', { p_cabin: cabinId, p_name: o.name, p_email: o.email, p_phone: o.phone });
         if (e5) problems.push(o.name);
       }
+    }
+    if (editing && smsId && smsId !== initialSms && !removed.includes(smsId)) {
+      const { error: e6 } = await supabase.rpc('admin_set_sms_contact', { p_cabin: cabinId, p_person: smsId });
+      if (e6) problems.push('valg av SMS-mottaker');
     }
     setBusy(false);
     if (!editing) {
@@ -405,6 +420,11 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
               </label>
               <div className="ownerrow-end">
                 {o.status && <StatusPill s={o.status} />}
+                {editing && o.id && (
+                  <label className="check smspick" title="Bare én eier per hytte får SMS-varsler">
+                    <input type="radio" name="sms-contact" checked={smsId === o.id} onChange={() => setSmsId(o.id!)} /> Får SMS
+                  </label>
+                )}
                 {(ownerRows.length > 1 || o.id) && <button type="button" className="linkbtn" onClick={() => removeOwner(o)}>Fjern</button>}
               </div>
             </div>
@@ -413,6 +433,10 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
         <button type="button" className="btn small" onClick={() => setOwnerRows((r) => [...r, { key: newKey(), name: '', email: '', phone: '' }])}>
           <Icon name="plus" size={16} />Legg til medeier
         </button>
+        <p className="muted" style={{ margin: '10px 0 0', fontSize: 13 }}>
+          {editing ? 'SMS-varsler går bare til eieren som er merket «Får SMS». Nye medeiere kan velges etter at de er lagret.'
+            : 'Den første eieren får SMS-varsler for hytta. Det kan endres senere under «Rediger».'}
+        </p>
         {!ownerRows.every((o) => o.email.trim() || !o.name.trim()) && (
           <p className="muted" style={{ margin: '10px 0 0', fontSize: 13 }}>Eiere uten e-post blir registrert, men kan ikke logge inn før e-post er lagt inn.</p>
         )}

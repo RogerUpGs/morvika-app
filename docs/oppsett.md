@@ -87,6 +87,7 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260928030000_eierskifte_app.sql` | Eierskifte fra appen, selgerens tilgang i 90 dager, sletting etter fristen | 27. sep 2026 |
 | `20260928040000_vann_avlop_del1.sql` | Mørvika Vann og Avløp, del 1: nye verdier (kjøres først, alene) | 28. sep 2026 |
 | `20260928041000_vann_avlop_del2.sql` | Mørvika Vann og Avløp, del 2: medlemskap (alle Mørvika-hytter), styre, meldinger, kontakter, push | 28. sep 2026 |
+| `20260928050000_sms.sql` | SMS-kontakt per hytte, veinavnfilter på varsler, SMS via 46elks med logg og oppgjør | **ikke kjørt** |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 
@@ -110,3 +111,22 @@ Rekkefølgen er viktig: hooken først, deretter påmelding. Uten hooken kunne hv
 6. **Test:** Åpne appen på telefonen (iPhone: lagt på Hjem-skjerm), trykk «Slå på varsler». Send et varsel fra PC-en til en gruppe telefonen er med i.
 
 Feilsøking: Edge Functions → push → Logs viser hvor mange som fikk varsel (`sent`). Ingen logglinjer betyr at databasen ikke når funksjonen (sjekk at pg_net er slått på under Database → Extensions).
+
+## SMS-varsling via 46elks (etter `20260928050000_sms.sql`)
+
+SMS er av til du slår det på. Det koster ingenting før det sendes SMS.
+
+1. Opprett konto på https://46elks.se og fyll på kreditt (ingen månedsavgift).
+2. Spør 46elks (help@46elks.com) om avsendernavnet «Morvika» fungerer mot norske mobilnumre.
+3. Under **Account** finner du *API username* og *API password*. Legg dem inn i Supabase → Edge Functions → **Secrets**:
+   * `ELKS_API_USERNAME`
+   * `ELKS_API_PASSWORD`
+   Ikke send dem til noen, heller ikke til Claude.
+4. Oppdater Edge Function **push** med koden i `supabase/functions/push/index.ts` (Raw på GitHub → kopier → lim inn → Deploy).
+5. I appen: Administrasjon → **SMS** → kryss av «SMS er på», sjekk avsendernavn og pris, trykk Lagre, og send en test til deg selv.
+
+Slik virker det:
+* Bare **akutte** og **viktige** varsler kan sendes som SMS («Send også som SMS»). Du ser antall mottakere og anslått pris før du sender.
+* Én SMS per hytte, til eieren som er merket **SMS** i hytteregisteret (den som ble registrert først). Byttes under «Rediger». Har SMS-kontakten ikke mobilnummer, går SMS-en til neste eier med mobilnummer. Samme nummer får bare én SMS.
+* Varsler kan avgrenses til veinavn. Da får bare hyttene i de veiene varselet (i appen, push og SMS).
+* Administrasjon → SMS viser hva hver avsender har sendt siden forrige oppgjør. Når regningen er betalt: skriv inn beløpet og trykk «Registrer oppgjør». Beløpet fordeles etter antall SMS-deler, og oversikten starter på null. Tidligere oppgjør ligger under «Tidligere oppgjør».
