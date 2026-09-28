@@ -5,6 +5,7 @@ import { dShort, firstName, greeting } from '../lib/format';
 import { Icon } from '../components/Icon';
 import { useNavItems } from '../lib/nav';
 import { useBadges } from '../lib/badges';
+import { useTaskCount } from '../lib/tasks';
 import { PushPrompt } from '../components/PushCard';
 import { InstallPrompt } from '../components/InstallPrompt';
 import { sendersFor } from '../lib/types';
@@ -15,6 +16,7 @@ export function Home({ go }: { go: (r: string) => void }) {
   const me = useMe();
   const items = useNavItems().filter((i) => i.key !== 'profil');
   const badges = useBadges();
+  const tasksDue = useTaskCount();
   const akutt = badges.openAlerts.some((a) => a.level === 'akutt');
   const [nextArr, setNextArr] = useState<string | null>(null);
   useEffect(() => { void nextEvent().then((e) => setNextArr(e ? e.starts_at : null)).catch(() => {}); }, []);
@@ -45,9 +47,10 @@ export function Home({ go }: { go: (r: string) => void }) {
     arr: nextArr ? `Neste ${dShort(nextArr)}` : 'Dugnad og treff',
     info: 'Dokumenter og kontakter',
     admin: 'Hytter og eiere',
+    gjoremal: tasksDue ? `${tasksDue} i dag eller forfalt` : 'Påminnelser for deg og hytta',
   };
-  const cnt = (k: string) => k === 'nyheter' ? unreadNews : k === 'varsler' ? badges.openAlerts.length : k === 'meldinger' ? badges.unreadThreads : k === 'chat' ? badges.newPosts : 0;
-  const order = ['chat', 'nyheter', 'varsler', 'meldinger', 'minhytte', 'arr', 'info', 'admin'];
+  const cnt = (k: string) => k === 'gjoremal' ? tasksDue : k === 'nyheter' ? unreadNews : k === 'varsler' ? badges.openAlerts.length : k === 'meldinger' ? badges.unreadThreads : k === 'chat' ? badges.newPosts : 0;
+  const order = ['chat', 'nyheter', 'varsler', 'meldinger', 'minhytte', 'gjoremal', 'arr', 'info', 'admin'];
   const tiles = order.map((k) => items.find((i) => i.key === k)).filter((x): x is NonNullable<typeof x> => Boolean(x));
   const place = me.cabins[0]?.area === 'torpum' ? 'Torpum' : 'Mørvika hytteområde';
 

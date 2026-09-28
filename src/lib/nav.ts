@@ -17,6 +17,7 @@ export function useNavItems(): NavItem[] {
     { key: 'arr', label: 'Arrangementer', icon: 'cal', group: 'Fellesskap' },
     { key: 'info', label: 'Info og dokumenter', icon: 'info', group: 'Fellesskap' },
   );
+  items.push({ key: 'gjoremal', label: 'Gjøremål', icon: 'todo', group: 'Min hytte' });
   if (roles.includes('admin')) items.push({ key: 'admin', label: 'Administrasjon', icon: 'admin', group: 'Administrasjon' });
   items.push({ key: 'profil', label: 'Min profil', icon: 'user', group: 'Deg' });
   return items;

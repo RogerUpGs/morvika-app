@@ -693,3 +693,51 @@ reset role;
 select pg_temp.check('utsendingen gir én SMS per nummer, bare én gang',
   (select count(*) from public.sms_batch_targets((select id from public.sms_batches limit 1))) = :inv_n
   and not exists (select 1 from public.sms_batch_targets((select id from public.sms_batches limit 1))));
+
+-- ---------------------------------------------------------------------
+-- Gjøremål
+-- ---------------------------------------------------------------------
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values ('00000000-0000-0000-0000-000000000601', 'medeier@example.no', '{"full_name":"Mona Medeier"}');
+insert into public.cabin_owners (cabin_id, user_id) values ('10000000-0000-0000-0000-000000000047', '00000000-0000-0000-0000-000000000601');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+insert into public.tasks (title, due_at, remind_before_min) values ('Min egen oppgave', now() + interval '2 days', 60);
+insert into public.tasks (title, due_at, cabin_id, repeat) values ('Tappe ned vannet', now() + interval '3 days', '10000000-0000-0000-0000-000000000047', 'maanedlig');
+select pg_temp.check('første påminnelse = tidspunkt minus «i forkant»',
+  (select next_remind_at = due_at - interval '60 minutes' from public.tasks where title = 'Min egen oppgave'));
+select pg_temp.fails('kan ikke dele gjøremål med en hytte man ikke eier',
+  $$insert into public.tasks (title, due_at, cabin_id) values ('x', now(), '10000000-0000-0000-0000-000000000012')$$);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000601';
+select pg_temp.check('medeier ser delte gjøremål, ikke private',
+  exists (select 1 from public.tasks where title = 'Tappe ned vannet') and not exists (select 1 from public.tasks where title = 'Min egen oppgave'));
+update public.tasks set done_at = now() where title = 'Tappe ned vannet';
+select pg_temp.check('medeier kan krysse av, og neste måned legges inn (samme klokkeslett)',
+  (select count(*) from public.tasks where title = 'Tappe ned vannet' and done_at is null) = 1
+  and (select to_char(due_at at time zone 'Europe/Oslo', 'HH24:MI') from public.tasks where title = 'Tappe ned vannet' and done_at is null)
+    = (select to_char(due_at at time zone 'Europe/Oslo', 'HH24:MI') from public.tasks where title = 'Tappe ned vannet' and done_at is not null)
+  and (select done_by from public.tasks where title = 'Tappe ned vannet' and done_at is not null) = '00000000-0000-0000-0000-000000000601');
+update public.tasks set done_at = null where title = 'Tappe ned vannet' and done_at is not null;
+update public.tasks set done_at = now() where title = 'Tappe ned vannet' and due_at < now() + interval '4 days';
+select pg_temp.check('av og på igjen gir ikke dobbelt neste gang',
+  (select count(*) from public.tasks where title = 'Tappe ned vannet' and done_at is null) = 1);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000999';
+select pg_temp.check('uvedkommende ser ingen gjøremål', not exists (select 1 from public.tasks));
+
+reset role;
+update public.tasks set next_remind_at = now() - interval '1 second', nag_min = 60 where title = 'Min egen oppgave';
+update public.tasks set next_remind_at = now() - interval '1 second' where title = 'Tappe ned vannet' and done_at is null;
+select public.send_task_reminders() as sent_n \gset
+select pg_temp.check('påminnelser sendes for gjøremål som er klare', :sent_n = 2 and (select count(*) from net.calls where body->>'table' = 'task_reminders') = 2);
+select pg_temp.check('varslet i forkant: neste påminnelse ved tidspunktet',
+  (select next_remind_at = due_at from public.tasks where title = 'Min egen oppgave'));
+select pg_temp.check('push for delt gjøremål går til begge eierne',
+  (select count(distinct t.user_id) from public.task_reminders r join public.tasks k on k.id = r.task_id and k.title = 'Tappe ned vannet',
+          lateral public.push_targets('task_reminders', r.id) t) = 2);
+select pg_temp.check('push for privat gjøremål går bare til eieren',
+  (select array_agg(t.user_id) from public.task_reminders r join public.tasks k on k.id = r.task_id and k.title = 'Min egen oppgave',
+          lateral public.push_targets('task_reminders', r.id) t) = array['00000000-0000-0000-0000-000000000101']::uuid[]);
+select pg_temp.check('ingen ny påminnelse før det er tid', public.send_task_reminders() = 0);

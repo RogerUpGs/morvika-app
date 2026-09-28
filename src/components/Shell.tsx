@@ -18,10 +18,12 @@ import { InfoPage } from '../pages/Info';
 import { MinHyttePage } from '../pages/MinHytte';
 import { sendersFor } from '../lib/types';
 import { useBadges } from '../lib/badges';
+import { useTaskCount } from '../lib/tasks';
+import { GjoremalPage } from '../pages/Gjoremal';
 
 const TITLES: Record<string, string> = {
   hjem: 'Hjem', minhytte: 'Min hytte', chat: 'Hyttepraten', nyheter: 'Nyheter', varsler: 'Varsler',
-  meldinger: 'Meldinger', del: 'Del fra feltet', arr: 'Arrangementer', info: 'Info', admin: 'Administrasjon', profil: 'Min profil',
+  meldinger: 'Meldinger', del: 'Del fra feltet', arr: 'Arrangementer', info: 'Info', admin: 'Administrasjon', profil: 'Min profil', gjoremal: 'Gjøremål',
 };
 
 export function Shell() {
@@ -42,7 +44,8 @@ export function Shell() {
   const eyebrow = me.veilagOnly ? 'Mørvikveien Veilag'
     : view === 'hjem' ? 'Mørvika hytteområde' : view === 'del' ? 'Nyheter' : items.find((i) => i.key === view)?.group ?? 'Fellesskap';
 
-  const count = (k: string) => k === 'varsler' ? badges.openAlerts.length : k === 'meldinger' ? badges.unreadThreads : k === 'chat' ? badges.newPosts : 0;
+  const tasksDue = useTaskCount();
+  const count = (k: string) => k === 'gjoremal' ? tasksDue : k === 'varsler' ? badges.openAlerts.length : k === 'meldinger' ? badges.unreadThreads : k === 'chat' ? badges.newPosts : 0;
   const top = badges.openAlerts.find((a) => a.level === 'akutt') ?? badges.openAlerts[0];
 
   let page: ReactNode;
@@ -58,6 +61,7 @@ export function Shell() {
     case 'arr': page = <EventsPage />; break;
     case 'info': page = <InfoPage />; break;
     case 'minhytte': page = <MinHyttePage />; break;
+    case 'gjoremal': page = <GjoremalPage />; break;
     default: page = <ComingSoon view={view} />;
   }
 
