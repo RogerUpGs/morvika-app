@@ -11,14 +11,17 @@ const mailText = (area: Area, name: string) => area === 'torpum' ? `Hei!
 
 Mørvikveien Veilag har fått en egen app. Der får du nyheter og viktige varsler fra Veilaget, for eksempel om brøyting, stengt vei og årsmøte, og du kan sende meldinger med bilder til Veilagets styre.
 
-Slik kommer du i gang:
-1. Gå til app.morvika.no på telefonen eller PC-en.
-2. Skriv inn denne e-postadressen (den du fikk denne e-posten på) og trykk «Send meg en kode».
-3. Skriv inn koden du får på e-post. Sjekk søppelpost hvis den ikke kommer.
-4. Legg appen på hjemskjermen, så får du varsler på telefonen:
-   iPhone: Safari → Del → «Legg til på Hjem-skjerm»
-   Android: Chrome → menyen (⋮) → «Installer app»
-5. Åpne appen fra hjemskjermen og trykk «Slå på varsler».
+Slik kommer du i gang på telefonen:
+1. Gå til app.morvika.no (iPhone: i Safari, Android: i Chrome).
+2. Legg appen på hjemskjermen:
+   iPhone: Del-knappen (på nyere iPhone under •••) → «Legg til på Hjem-skjerm»
+   Android: menyen (⋮) → «Legg til på startskjermen» eller «Installer app»
+3. Åpne appen fra ikonet på hjemskjermen. Skriv inn denne e-postadressen og trykk «Send meg en kode».
+4. Skriv inn koden du får på e-post. Sjekk søppelpost hvis den ikke kommer.
+5. Trykk «Slå på varsler», så får du beskjed på telefonen.
+
+Veiledning med bilder: app.morvika.no/installer
+På PC går du bare til app.morvika.no og logger inn.
 
 Er du registrert med feil e-postadresse, svar på denne e-posten.
 
@@ -33,14 +36,17 @@ Nå har Mørvika hytteområde fått en egen app. Der finner du:
 • dugnader og arrangementer med påmelding
 • Min hytte: din private del med dokumenter, bilder og hytteregnskap
 
-Slik kommer du i gang:
-1. Gå til app.morvika.no på telefonen eller PC-en.
-2. Skriv inn denne e-postadressen (den du fikk denne e-posten på) og trykk «Send meg en kode».
-3. Skriv inn koden du får på e-post. Sjekk søppelpost hvis den ikke kommer.
-4. Legg appen på hjemskjermen, så får du varsler på telefonen:
-   iPhone: Safari → Del → «Legg til på Hjem-skjerm»
-   Android: Chrome → menyen (⋮) → «Installer app»
-5. Åpne appen fra hjemskjermen og trykk «Slå på varsler».
+Slik kommer du i gang på telefonen:
+1. Gå til app.morvika.no (iPhone: i Safari, Android: i Chrome).
+2. Legg appen på hjemskjermen:
+   iPhone: Del-knappen (på nyere iPhone under •••) → «Legg til på Hjem-skjerm»
+   Android: menyen (⋮) → «Legg til på startskjermen» eller «Installer app»
+3. Åpne appen fra ikonet på hjemskjermen. Skriv inn denne e-postadressen og trykk «Send meg en kode».
+4. Skriv inn koden du får på e-post. Sjekk søppelpost hvis den ikke kommer.
+5. Trykk «Slå på varsler», så får du beskjed på telefonen.
+
+Veiledning med bilder: app.morvika.no/installer
+På PC går du bare til app.morvika.no og logger inn.
 
 Er du registrert med feil e-postadresse, eller skal en medeier også ha tilgang? Svar på denne e-posten.
 

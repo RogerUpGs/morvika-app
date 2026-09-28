@@ -78,7 +78,9 @@ export function Login() {
           </>
         )}
 
-        <p className="note">Har du fått et brev med QR-kode? Skann den med kameraet på telefonen, så logges du inn uten å taste noe. QR-koder kommer sammen med invitasjonene.</p>
+        {!window.matchMedia('(display-mode: standalone)').matches && !(navigator as { standalone?: boolean }).standalone && (
+          <p className="note">På mobil: legg appen på hjemskjermen <b>før</b> du logger inn. <a href="/installer">Se veiledning med bilder</a>.</p>
+        )}
       </div>
     </main>
   );
