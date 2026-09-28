@@ -140,6 +140,7 @@ Deno.serve(async (req) => {
 
   let sent = 0;
   const gone: string[] = [];
+  const errors: string[] = [];   // vises i svaret, så feil kan leses i databasen (net._http_response)
   await Promise.all((subs ?? []).map(async (s) => {
     const t = byUser.get(s.user_id)!;
     try {
@@ -152,9 +153,14 @@ Deno.serve(async (req) => {
     } catch (e) {
       const code = (e as { statusCode?: number }).statusCode;
       if (code === 404 || code === 410) gone.push(s.id);   // Telefonen har slått av varsler eller appen er fjernet
-      else console.error('push feilet', code, (e as Error).message);
+      else {
+        const host = (() => { try { return new URL(s.endpoint).host; } catch { return '?'; } })();
+        const body = (e as { body?: string }).body ?? '';
+        errors.push(`${host} ${code ?? ''} ${(e as Error).message} ${body}`.slice(0, 200));
+        console.error('push feilet', code, (e as Error).message, body);
+      }
     }
   }));
   if (gone.length) await supa.from('push_subscriptions').delete().in('id', gone);
-  return json({ sent, removed: gone.length, users: byUser.size, ...(await smsJob) });
+  return json({ sent, removed: gone.length, users: byUser.size, subs: (subs ?? []).length, ...(errors.length ? { errors: errors.slice(0, 4) } : {}), ...(await smsJob) });
 });
