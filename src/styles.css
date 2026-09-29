@@ -762,3 +762,7 @@ tr.editing td{background:var(--primary-soft)}
 .docedit{flex:1;display:flex;gap:8px;align-items:center}
 .docedit input{flex:1;min-width:0}
 @media (max-width:700px){.docline{flex-wrap:wrap}.docacts{width:100%;justify-content:flex-end}}
+
+/* Appen på hjemskjermen (iPhone/iPad): dekk stripen bak klokke og batteri,
+   så innhold ikke synes der når man ruller */
+body::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:40;pointer-events:none}
