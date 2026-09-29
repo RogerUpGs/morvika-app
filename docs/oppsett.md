@@ -92,6 +92,7 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260928070000_push_rettighet.sql` | Push-funksjonen får lese push-abonnementene (retter manglende push) | 28. sep 2026 |
 | `20260928080000_gjoremal.sql` | Gjøremål med påminnelse, gjentakelse, utsett og deling med medeiere (planlagt jobb hvert minutt) | **ikke kjørt** |
 | `20260928090000_fdv.sql` | FDV-mal i Min hytte og eierskifte «Overlevering fra utbygger» | **ikke kjørt** |
+| `20260929000000_dokumenter_rediger.sql` | Info: styret kan endre tittel/kategori og slette dokumenter for sin forening | **ikke kjørt** |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 

@@ -741,3 +741,24 @@ tr.editing td{background:var(--primary-soft)}
 .fdvbar .fdvtxt .muted{font-size:14px}
 .fdvbar .fdvacts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .seg.three3{grid-template-columns:repeat(3,minmax(0,1fr))}
+
+/* ---------- Dokumentarkiv (Info) ---------- */
+.docbrowser .chips small{opacity:.65;margin-left:4px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--s-grunn);vertical-align:1px}
+.dot.vel{background:var(--s-vel)} .dot.va{background:var(--s-va)} .dot.vei{background:var(--s-vei)} .dot.admin{background:var(--s-admin)}
+.docfilters{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:8px;margin:10px 0 12px;align-items:center}
+@media (max-width:700px){.docfilters{grid-template-columns:1fr 1fr auto}.docfilters input{grid-column:1/-1}}
+@media (max-width:700px){.docbrowser .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}.docbrowser .chip{flex:none}}
+.docline .doclink span{min-width:0}
+.doctable{padding:0;overflow:hidden}
+.docscroll{max-height:min(62vh,620px)}
+.docline{display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--line)}
+.docline:first-child{border-top:0}
+.docline .doclink{flex:1;min-width:0}
+.docline .doclink b{display:block;overflow-wrap:anywhere}
+.docline .doclink small{display:block;color:var(--muted)}
+.docacts{display:flex;gap:10px;align-items:center;flex:none}
+.docacts .movesel{max-width:130px;font-size:13px;padding:4px 6px}
+.docedit{flex:1;display:flex;gap:8px;align-items:center}
+.docedit input{flex:1;min-width:0}
+@media (max-width:700px){.docline{flex-wrap:wrap}.docacts{width:100%;justify-content:flex-end}}

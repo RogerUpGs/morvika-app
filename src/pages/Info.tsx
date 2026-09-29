@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { useMe } from '../lib/session';
 import { useToast } from '../lib/ui';
@@ -8,7 +8,7 @@ import { Icon } from '../components/Icon';
 
 type Grp = 'grunneier' | 'vel' | 'va' | 'vei' | 'nyttig';
 const GRP_LABEL: Record<Grp, string> = { grunneier: 'Grunneier', vel: 'Mørvika Vel', va: 'Mørvika Vann og Avløp', vei: 'Mørvikveien Veilag', nyttig: 'Nyttige nummer' };
-const CATEGORIES = ['Vedtekter', 'Referater', 'Vei og brøyting', 'Kart og tomter', 'Regler og avtaler', 'Annet'];
+const CATEGORIES = ['Vedtekter', 'Årsmøter og protokoller', 'Referater', 'Regnskap og budsjett', 'Kart og tomter', 'Tegninger og planer', 'Vei og brøyting', 'Regler og avtaler', 'Annet'];
 
 interface Contact { id: string; grp: Grp; title: string; name: string; phone: string | null; email: string | null; note: string; sort: number }
 interface Doc { id: string; title: string; owner: Sender; storage_path: string; category: string; size_bytes: number | null; file_name: string | null; created_by: string | null; created_at: string }
@@ -75,32 +75,8 @@ export function InfoPage() {
         </div>
         {upload && <DocForm owners={publishAs} uid={uid} onDone={() => { setUpload(false); void load(); }} onCancel={() => setUpload(false)} />}
         {docs === null && <div className="empty">Henter …</div>}
-        {docs && (
-          <div className="docgroups">
-            {docOwners.map((o) => {
-              const list = docs.filter((d) => d.owner === o);
-              if (!list.length && !publishAs.includes(o)) return null;
-              return (
-                <div key={o} className="card docgroup">
-                  <h3><span className={`badge ${o === 'grunneier' ? '' : o}`}>{SENDER_LABEL[o]}</span></h3>
-                  {list.length === 0 && <p className="muted" style={{ margin: 0 }}>Ingen dokumenter ennå.</p>}
-                  {list.map((d) => (
-                    <div key={d.id} className="docrow2">
-                      <button className="doclink" onClick={() => void openDoc(d)}>
-                        <Icon name="doc" size={20} />
-                        <span><b>{d.title}</b><small>{d.category} · {dShort(d.created_at)}{d.size_bytes ? ` · ${size(d.size_bytes)}` : ''}</small></span>
-                      </button>
-                      {(d.created_by === uid || isAdmin || publishAs.includes(d.owner)) && (confirmDel === d.id ? (
-                        <span className="confirm"><button className="btn small danger-btn" onClick={() => void removeDoc(d)}>Slett</button>
-                          <button className="btn small ghost" onClick={() => setConfirmDel(null)}>Avbryt</button></span>
-                      ) : <button className="linkbtn" onClick={() => setConfirmDel(d.id)}>Slett</button>)}
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {docs && <DocBrowser docs={docs} owners={docOwners} publishAs={publishAs} canDelete={(d) => d.created_by === uid || isAdmin || publishAs.includes(d.owner)}
+          canEditDoc={(d) => isAdmin || publishAs.includes(d.owner)} open={(d) => void openDoc(d)} remove={(d) => void removeDoc(d)} reload={load} />}
       </section>
 
       <section style={{ marginTop: 28 }}>
@@ -242,5 +218,109 @@ function DocForm({ owners, uid, onDone, onCancel }: { owners: Sender[]; uid: str
         <button className="btn primary" disabled={busy || !file}>{busy ? 'Laster opp …' : 'Legg ut'}</button>
       </div>
     </form>
+  );
+}
+
+/* ---------- Dokumentarkiv: filtrer på avsender og kategori, søk og sorter ---------- */
+function DocBrowser({ docs, owners, publishAs, canDelete, canEditDoc, open, remove, reload }: {
+  docs: Doc[]; owners: Sender[]; publishAs: Sender[];
+  canDelete: (d: Doc) => boolean; canEditDoc: (d: Doc) => boolean;
+  open: (d: Doc) => void; remove: (d: Doc) => void; reload: () => Promise<void>;
+}) {
+  const toast = useToast();
+  const [owner, setOwner] = useState<Sender | 'alle'>(() => { try { return (localStorage.getItem('info-owner') as Sender) || 'alle'; } catch { return 'alle'; } });
+  const [cat, setCat] = useState<string>('alle');
+  const [q, setQ] = useState('');
+  const [sort, setSort] = useState<'ny' | 'az'>('ny');
+  const [confirmDel, setConfirmDel] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [title, setTitle] = useState('');
+  const [arrange, setArrange] = useState(false);   // «Ordne dokumenter»: vis flytt/gi nytt navn/slett
+
+  const pickOwner = (o: Sender | 'alle') => { setOwner(o); setCat('alle'); try { localStorage.setItem('info-owner', o); } catch { /* */ } };
+  const visibleOwners = owners.filter((o) => docs.some((d) => d.owner === o) || publishAs.includes(o));
+  const byOwner = owner === 'alle' ? docs : docs.filter((d) => d.owner === owner);
+  const cats = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const d of byOwner) m.set(d.category, (m.get(d.category) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], 'nb'));
+  }, [byOwner]);
+  const s = q.trim().toLowerCase();
+  const shown = byOwner
+    .filter((d) => (cat === 'alle' || d.category === cat) && (!s || d.title.toLowerCase().includes(s) || (d.file_name ?? '').toLowerCase().includes(s) || d.category.toLowerCase().includes(s)))
+    .sort((a, b) => sort === 'az' ? a.title.localeCompare(b.title, 'nb', { numeric: true }) : b.created_at.localeCompare(a.created_at));
+
+  async function save(d: Doc, patch: Partial<Pick<Doc, 'title' | 'category'>>) {
+    const { error } = await supabase.from('shared_documents').update(patch).eq('id', d.id);
+    if (error) { toast('Endringen ble ikke lagret. Er databasen oppdatert?'); return; }
+    setEditing(null);
+    toast(patch.category ? `Flyttet til «${patch.category}».` : 'Tittelen er endret.');
+    await reload();
+  }
+
+  if (!docs.length && !publishAs.length) return <div className="empty">Ingen dokumenter ennå.</div>;
+  return (
+    <div className="docbrowser">
+      <div className="chips" role="group" aria-label="Fra">
+        <button className={`chip ${owner === 'alle' ? 'on' : ''}`} onClick={() => pickOwner('alle')}>Alle <small>{docs.length}</small></button>
+        {visibleOwners.map((o) => (
+          <button key={o} className={`chip ${owner === o ? 'on' : ''}`} onClick={() => pickOwner(o)}>
+            <span className={`dot ${o}`} />{SENDER_LABEL[o]} <small>{docs.filter((d) => d.owner === o).length}</small>
+          </button>
+        ))}
+      </div>
+      <div className="docfilters">
+        <input type="search" placeholder="Søk i dokumenter" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Søk i dokumenter" />
+        <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Kategori">
+          <option value="alle">Alle kategorier ({byOwner.length})</option>
+          {cats.map(([c, n]) => <option key={c} value={c}>{c} ({n})</option>)}
+        </select>
+        <select value={sort} onChange={(e) => setSort(e.target.value as 'ny' | 'az')} aria-label="Sortering">
+          <option value="ny">Nyeste først</option>
+          <option value="az">Alfabetisk</option>
+        </select>
+        {docs.some(canDelete) && <button className={`btn small ${arrange ? 'primary' : 'ghost'}`} onClick={() => setArrange((v) => !v)}>{arrange ? 'Ferdig' : 'Ordne'}</button>}
+      </div>
+
+      <div className="card doctable">
+        {shown.length === 0 && <p className="muted" style={{ margin: 0, padding: 16 }}>{s ? `Ingen treff på «${q}».` : 'Ingen dokumenter her ennå.'}</p>}
+        <div className="scrollbox docscroll">
+          {shown.map((d) => (
+            <div key={d.id} className="docline">
+              {editing === d.id ? (
+                <form className="docedit" onSubmit={(e) => { e.preventDefault(); if (title.trim()) void save(d, { title: title.trim() }); }}>
+                  <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus aria-label="Tittel" />
+                  <button className="btn small primary">Lagre</button>
+                  <button type="button" className="btn small ghost" onClick={() => setEditing(null)}>Avbryt</button>
+                </form>
+              ) : (
+                <button className="doclink" onClick={() => open(d)}>
+                  <Icon name="doc" size={20} />
+                  <span><b>{d.title}</b>
+                    <small>{owner === 'alle' && <><span className={`dot ${d.owner}`} />{SENDER_LABEL[d.owner]} · </>}{d.category} · {dShort(d.created_at)}{d.size_bytes ? ` · ${size(d.size_bytes)}` : ''}</small>
+                  </span>
+                </button>
+              )}
+              {arrange && editing !== d.id && (
+                <span className="docacts">
+                  {canEditDoc(d) && (
+                    <>
+                      <select className="movesel" value="" onChange={(e) => { if (e.target.value) void save(d, { category: e.target.value }); }} aria-label={`Endre kategori for ${d.title}`}>
+                        <option value="">Kategori …</option>{CATEGORIES.filter((c) => c !== d.category).map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <button className="linkbtn2" onClick={() => { setEditing(d.id); setTitle(d.title); }}>Gi nytt navn</button>
+                    </>
+                  )}
+                  {canDelete(d) && (confirmDel === d.id ? (
+                    <span className="confirm"><button className="btn small danger-btn" onClick={() => { setConfirmDel(null); remove(d); }}>Slett</button>
+                      <button className="btn small ghost" onClick={() => setConfirmDel(null)}>Avbryt</button></span>
+                  ) : <button className="linkbtn" onClick={() => setConfirmDel(d.id)}>Slett</button>)}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
