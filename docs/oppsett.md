@@ -90,9 +90,9 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260928050000_sms.sql` | SMS-kontakt per hytte, veinavnfilter på varsler, SMS via 46elks med logg og oppgjør | 28. sep 2026 |
 | `20260928060000_sms_invitasjon.sql` | Invitasjon på SMS til dem som ikke har logget inn | 28. sep 2026 |
 | `20260928070000_push_rettighet.sql` | Push-funksjonen får lese push-abonnementene (retter manglende push) | 28. sep 2026 |
-| `20260928080000_gjoremal.sql` | Gjøremål med påminnelse, gjentakelse, utsett og deling med medeiere (planlagt jobb hvert minutt) | **ikke kjørt** |
-| `20260928090000_fdv.sql` | FDV-mal i Min hytte og eierskifte «Overlevering fra utbygger» | **ikke kjørt** |
-| `20260929000000_dokumenter_rediger.sql` | Info: styret kan endre tittel/kategori og slette dokumenter for sin forening | **ikke kjørt** |
+| `20260928080000_gjoremal.sql` | Gjøremål med påminnelse, gjentakelse, utsett og deling med medeiere (planlagt jobb hvert minutt) | 29. sep 2026 |
+| `20260928090000_fdv.sql` | FDV-mal i Min hytte og eierskifte «Overlevering fra utbygger» | 29. sep 2026 |
+| `20260929000000_dokumenter_rediger.sql` | Info: styret kan endre tittel/kategori og slette dokumenter for sin forening | 29. sep 2026 |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 
