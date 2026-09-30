@@ -44,6 +44,62 @@ async function openFile(bucket: string, path: string, toast: (m: string) => void
   if (w) w.location.href = data.signedUrl; else window.location.href = data.signedUrl;
 }
 
+/* ---------- Nedlasting av én fil eller flere som ZIP ---------- */
+interface DlFile { bucket: string; path: string; folder: string; name: string; date: string }
+const cleanName = (t: string) => t.replace(/[\\/:*?"<>|·]+/g, '').replace(/\s+/g, ' ').trim();
+function saveBlob(blob: Blob, name: string) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+}
+/** Henter filene og lagrer dem: én fil lagres som den er, flere blir én ZIP-fil med mappene */
+async function downloadFiles(files: DlFile[], zipName: string, progress: (s: string | null) => void): Promise<{ ok: number; failed: number }> {
+  if (files.length === 1) {
+    progress('Henter …');
+    const { data, error } = await supabase.storage.from(files[0].bucket).download(files[0].path);
+    progress(null);
+    if (error || !data) return { ok: 0, failed: 1 };
+    saveBlob(data, cleanName(files[0].name) || 'fil');
+    return { ok: 1, failed: 0 };
+  }
+  const used = new Set<string>(); const entries: ZipEntry[] = []; let failed = 0;
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    progress(`Henter ${i + 1} av ${files.length} …`);
+    const { data, error } = await supabase.storage.from(f.bucket).download(f.path);
+    if (error || !data) { failed++; continue; }
+    entries.push({ name: uniqueName(used, f.folder, f.name), data: new Uint8Array(await data.arrayBuffer()), date: new Date(f.date) });
+  }
+  progress('Lager ZIP-fil …');
+  if (entries.length) saveBlob(makeZip(entries), `${cleanName(zipName)}.zip`);
+  progress(null);
+  return { ok: entries.length, failed };
+}
+const photoFileName = (p: Photo) => {
+  const e = (p.storage_path.split('.').pop() || 'jpg').slice(0, 4);
+  const d = new Date(p.created_at);
+  const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${p.caption ? `${p.caption.slice(0, 60)} ` : 'Bilde '}${stamp}.${e}`;
+};
+
+/** Verktøylinje når man velger filer for nedlasting */
+function SelectBar({ n, all, allLabel, onAll, onNone, onDownload, onCancel, busy }: {
+  n: number; all: number; allLabel: string; onAll: () => void; onNone: () => void; onDownload: () => void; onCancel: () => void; busy: string | null;
+}) {
+  return (
+    <div className="selbar card">
+      <b>{n ? `${n} valgt` : 'Trykk på det du vil laste ned'}</b>
+      <div className="selbar-a">
+        {n < all ? <button className="btn small" onClick={onAll}>{allLabel} ({all})</button> : <button className="btn small ghost" onClick={onNone}>Fjern valg</button>}
+        <button className="btn small primary" disabled={!n || busy !== null} onClick={onDownload}><Icon name="upload" size={15} />{busy ?? (n > 1 ? `Last ned ${n} som ZIP` : 'Last ned')}</button>
+        <button className="btn small ghost" onClick={onCancel}>Ferdig</button>
+      </div>
+    </div>
+  );
+}
+
 export function MinHyttePage() {
   const me = useMe();
   const toast = useToast();
@@ -135,8 +191,8 @@ export function MinHyttePage() {
         </div>
       )}
       {!loaded && tab !== 'home' && <div className="empty">Henter …</div>}
-      {loaded && own && tab === 'dok' && <Documents cabinId={cabin.id} own={own} docs={docs} archive={archive} reload={load} toast={toast} fdv={fdv} access={access} />}
-      {loaded && own && tab === 'foto' && <Photos cabinId={cabin.id} own={own} albums={albums} photos={photos} reload={load} toast={toast} access={access} />}
+      {loaded && own && tab === 'dok' && <Documents title={cabin.project_name || cabin.label} cabinId={cabin.id} own={own} docs={docs} archive={archive} reload={load} toast={toast} fdv={fdv} access={access} />}
+      {loaded && own && tab === 'foto' && <Photos title={cabin.project_name || cabin.label} cabinId={cabin.id} own={own} albums={albums} photos={photos} reload={load} toast={toast} access={access} />}
       {loaded && own && hasChat && tab === 'prat' && <ProjectChat own={own} uid={access.uid} participants={people} open={chatOpen} toast={toast} onChange={() => void load()} />}
       {loaded && own && !worker && tab === 'regn' && <Ledger cabinId={cabin.id} own={own} ledger={ledger} reload={load} toast={toast} label={cabin.label} />}
     </>
@@ -233,26 +289,11 @@ function FdvBar({ cabin, own, fdv, docs, archive, photos, albums, reload, toast 
       ...photos.map((p, i) => {
         const al = albums.find((a) => a.id === p.album_id)?.name ?? 'Uten album';
         const e = (p.storage_path.split('.').pop() || 'jpg').slice(0, 4);
-        return { bucket: 'hytte', path: p.storage_path, folder: `Bilder/${al}`, name: `${p.caption ? p.caption.slice(0, 60) : `Bilde ${photos.length - i}`}.${e}`, date: p.created_at };
+        return { bucket: 'hytte', path: p.storage_path, folder: `Bilder/${al}`, name: `${p.caption ? p.caption.slice(0, 60) : `Bilde ${photos.length - i}`}.${e}`, date: p.created_at } as DlFile;
       }),
     ];
-    const used = new Set<string>(); const entries: ZipEntry[] = []; let failed = 0;
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      setProgress(`Henter ${i + 1} av ${files.length} …`);
-      const { data, error } = await supabase.storage.from(f.bucket).download(f.path);
-      if (error || !data) { failed++; continue; }
-      entries.push({ name: uniqueName(used, f.folder, f.name), data: new Uint8Array(await data.arrayBuffer()), date: new Date(f.date) });
-    }
-    setProgress('Lager ZIP-fil …');
-    const blob = makeZip(entries);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${cabin.label.replace(/[\\/:*?"<>|·]+/g, '').replace(/\s+/g, ' ').trim()} – FDV og bilder.zip`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
-    setProgress(null);
-    toast(failed ? `ZIP-filen er lastet ned, men ${failed} filer kunne ikke hentes.` : `ZIP-filen med ${entries.length} filer er lastet ned.`);
+    const { ok, failed } = await downloadFiles(files, `${cabin.label} – FDV og bilder`, setProgress);
+    toast(failed ? `Lastet ned ${ok} filer, men ${failed} kunne ikke hentes.` : `ZIP-filen med ${ok} filer er lastet ned.`);
   }
 
   return (
@@ -278,8 +319,8 @@ function FdvBar({ cabin, own, fdv, docs, archive, photos, albums, reload, toast 
 }
 
 /* ---------- Dokumentregister ---------- */
-function Documents({ cabinId, own, docs, archive, reload, toast, fdv, access }: {
-  cabinId: string; own: string; docs: Doc[]; archive: Arch[]; reload: () => Promise<void>; toast: (m: string) => void; fdv: boolean; access: Access;
+function Documents({ title, cabinId, own, docs, archive, reload, toast, fdv, access }: {
+  title: string; cabinId: string; own: string; docs: Doc[]; archive: Arch[]; reload: () => Promise<void>; toast: (m: string) => void; fdv: boolean; access: Access;
 }) {
   const BASE = fdv ? FDV_FOLDERS : FOLDERS;
   const custom = [...new Set(docs.map((d) => d.folder))].filter((f) => !BASE.includes(f));
@@ -291,6 +332,8 @@ function Documents({ cabinId, own, docs, archive, reload, toast, fdv, access }: 
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const [drag, setDrag] = useState(false);
+  const [sel, setSel] = useState<string[] | null>(null);   // valgte dokumenter for nedlasting
+  const [dl, setDl] = useState<string | null>(null);
 
   useEffect(() => { if (folder !== 'Alle' && folder !== ARCHIVE) setTarget(folder); }, [folder]);
   const count = (f: string) => (f === 'Alle' ? docs.length : f === ARCHIVE ? archive.length : docs.filter((d) => d.folder === f).length);
@@ -322,6 +365,17 @@ function Documents({ cabinId, own, docs, archive, reload, toast, fdv, access }: 
     if (error) { toast('Dokumentet ble ikke slettet.'); return; }
     await supabase.storage.from('hytte').remove([d.storage_path]);
     toast('Dokumentet er slettet.'); await reload();
+  }
+
+  const toggle = (id: string) => setSel((x) => (x ?? []).includes(id) ? (x ?? []).filter((y) => y !== id) : [...(x ?? []), id]);
+  async function download() {
+    const list = docs.filter((d) => sel?.includes(d.id));
+    const one = new Set(list.map((d) => d.folder)).size === 1;
+    const { ok, failed } = await downloadFiles(
+      list.map((d) => ({ bucket: 'hytte', path: d.storage_path, folder: one ? d.folder : `Dokumenter/${d.folder}`, name: d.name, date: d.created_at })),
+      `${title} – ${one ? list[0].folder : 'Dokumenter'}`, setDl);
+    toast(failed ? `Lastet ned ${ok}, men ${failed} kunne ikke hentes.` : ok === 1 ? 'Dokumentet er lastet ned.' : `ZIP-filen med ${ok} dokumenter er lastet ned.`);
+    if (!failed) setSel(null);
   }
 
   async function move(d: Doc, to: string) {
@@ -376,14 +430,22 @@ function Documents({ cabinId, own, docs, archive, reload, toast, fdv, access }: 
             </div>
           </div>
           <div className="card doclist">
-            <div className="doclist-h"><b>{folder === 'Alle' ? 'Alle dokumenter' : folder}</b><span className="muted">{shown.length} {shown.length === 1 ? 'fil' : 'filer'}</span></div>
+            <div className="doclist-h"><b>{folder === 'Alle' ? 'Alle dokumenter' : folder}</b><span className="muted">{shown.length} {shown.length === 1 ? 'fil' : 'filer'}</span>
+              {sel === null && shown.length > 0 && <button className="btn small ghost dlpick" onClick={() => setSel([])}><Icon name="check" size={15} />Velg for nedlasting</button>}
+            </div>
+            {sel !== null && (
+              <SelectBar n={sel.length} all={shown.length} allLabel={folder === 'Alle' ? 'Velg alle' : `Velg hele «${folder}»`} busy={dl}
+                onAll={() => setSel((x) => [...new Set([...(x ?? []), ...shown.map((d) => d.id)])])} onNone={() => setSel([])}
+                onDownload={() => void download()} onCancel={() => setSel(null)} />
+            )}
             {shown.map((d) => (
-              <div key={d.id} className="docrow">
+              <div key={d.id} className={`docrow ${sel !== null ? "selmode" : ""} ${sel?.includes(d.id) ? "picked" : ""}`}>
+                {sel !== null && <input type="checkbox" className="dlcheck" checked={sel.includes(d.id)} onChange={() => toggle(d.id)} aria-label={`Velg ${d.name}`} />}
                 <span className={`ftag t-${ext(d.name).toLowerCase()}`}>{ext(d.name) || 'FIL'}</span>
-                <button className="dm docbtn2" onClick={() => void openFile('hytte', d.storage_path, toast)}>
+                <button className="dm docbtn2" onClick={() => (sel !== null ? toggle(d.id) : void openFile('hytte', d.storage_path, toast))}>
                   <div className="n">{d.name}</div><div className="d">{d.folder}{d.size_bytes ? ` · ${size(d.size_bytes)}` : ''} · {dShort(d.created_at)}{byLine(access, d.uploaded_by) && ` · av ${byLine(access, d.uploaded_by)}`}</div>
                 </button>
-                {mayEdit(access, d.uploaded_by) && <span className="docacts">
+                {sel === null && mayEdit(access, d.uploaded_by) && <span className="docacts">
                   <select aria-label={`Flytt ${d.name}`} value="" onChange={(e) => e.target.value && void move(d, e.target.value)}>
                     <option value="">Flytt …</option>{folders.filter((f) => f !== d.folder).map((f) => <option key={f} value={f}>{f}</option>)}
                   </select>
@@ -402,8 +464,8 @@ function Documents({ cabinId, own, docs, archive, reload, toast, fdv, access }: 
 }
 
 /* ---------- Fotoalbum ---------- */
-function Photos({ cabinId, own, albums, photos, reload, toast, access }: {
-  cabinId: string; own: string; albums: Album[]; photos: Photo[]; reload: () => Promise<void>; toast: (m: string) => void; access: Access;
+function Photos({ title, cabinId, own, albums, photos, reload, toast, access }: {
+  title: string; cabinId: string; own: string; albums: Album[]; photos: Photo[]; reload: () => Promise<void>; toast: (m: string) => void; access: Access;
 }) {
   const [album, setAlbum] = useState<string>('alle');
   const [target, setTarget] = useState<string>(albums[0]?.id ?? '');
@@ -412,6 +474,8 @@ function Photos({ cabinId, own, albums, photos, reload, toast, access }: {
   const [open, setOpen] = useState<number | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const [selected, setSelected] = useState<Photo | null>(null);
+  const [sel, setSel] = useState<string[] | null>(null);   // valgte bilder for nedlasting
+  const [dl, setDl] = useState<string | null>(null);
 
   useEffect(() => { if (album !== 'alle' && album !== 'ingen') setTarget(album); }, [album]);
   useEffect(() => { if (!target && albums[0]) setTarget(albums[0].id); }, [albums, target]);
@@ -464,6 +528,18 @@ function Photos({ cabinId, own, albums, photos, reload, toast, access }: {
     if (error) toast('Albumet ble ikke slettet.'); else { toast('Albumet er slettet. Bildene ligger under «Uten album».'); setAlbum('alle'); await reload(); }
   }
 
+  const toggle = (id: string) => setSel((x) => (x ?? []).includes(id) ? (x ?? []).filter((y) => y !== id) : [...(x ?? []), id]);
+  const albumName = (id: string | null) => albums.find((a) => a.id === id)?.name ?? 'Uten album';
+  async function download() {
+    const list = photos.filter((p) => sel?.includes(p.id));
+    const one = new Set(list.map((p) => p.album_id)).size === 1;
+    const { ok, failed } = await downloadFiles(
+      list.map((p) => ({ bucket: 'hytte', path: p.storage_path, folder: one ? albumName(p.album_id) : `Bilder/${albumName(p.album_id)}`, name: photoFileName(p), date: p.created_at })),
+      `${title} – ${one ? albumName(list[0].album_id) : 'Bilder'}`, setDl);
+    toast(failed ? `Lastet ned ${ok}, men ${failed} kunne ikke hentes.` : ok === 1 ? 'Bildet er lastet ned.' : `ZIP-filen med ${ok} bilder er lastet ned.`);
+    if (!failed) setSel(null);
+  }
+
   const cover = (a: string) => { const p = inAlbum(a)[0]; return p && urls[p.storage_path] ? { backgroundImage: `url("${urls[p.storage_path]}")` } : undefined; };
 
   return (
@@ -504,19 +580,28 @@ function Photos({ cabinId, own, albums, photos, reload, toast, access }: {
 
       <div className="galhead">
         <h3 className="serif">{album === 'alle' ? 'Alle bilder' : album === 'ingen' ? 'Uten album' : albums.find((a) => a.id === album)?.name}</h3>
-        <span className="muted">{shown.length} {shown.length === 1 ? 'bilde' : 'bilder'}{shown.length ? ' · trykk for å se stort' : ''}</span>
+        <span className="muted">{shown.length} {shown.length === 1 ? 'bilde' : 'bilder'}{shown.length && sel === null ? ' · trykk for å se stort' : ''}</span>
+        {sel === null && shown.length > 0 && <button className="btn small ghost dlpick" onClick={() => setSel([])}><Icon name="check" size={15} />Velg for nedlasting</button>}
         {!access.worker && album !== 'alle' && album !== 'ingen' && (confirmDel === album
           ? <span className="confirm">Slette albumet? Bildene blir liggende.<button className="btn small danger-btn" onClick={() => void removeAlbum(albums.find((a) => a.id === album)!)}>Slett album</button><button className="btn small ghost" onClick={() => setConfirmDel(null)}>Avbryt</button></span>
           : <button className="linkbtn" onClick={() => setConfirmDel(album)}>Slett album</button>)}
       </div>
+      {sel !== null && (
+        <SelectBar n={sel.length} all={shown.length} busy={dl}
+          allLabel={album === 'alle' ? 'Velg alle' : `Velg hele «${album === 'ingen' ? 'Uten album' : albumName(album)}»`}
+          onAll={() => setSel((x) => [...new Set([...(x ?? []), ...shown.map((p) => p.id)])])} onNone={() => setSel([])}
+          onDownload={() => void download()} onCancel={() => setSel(null)} />
+      )}
       {shown.length ? (
-        <div className="pgrid">
+        <div className={`pgrid ${sel !== null ? 'picking' : ''}`}>
           {shown.map((p, i) => (
-            <div key={p.id} className="ptwrap">
-              <button className="pt" style={urls[p.storage_path] ? { backgroundImage: `url("${urls[p.storage_path]}")` } : undefined} onClick={() => setOpen(i)} aria-label={`Vis ${p.caption || 'bilde'}`}>
+            <div key={p.id} className={`ptwrap ${sel?.includes(p.id) ? 'picked' : ''}`}>
+              <button className="pt" style={urls[p.storage_path] ? { backgroundImage: `url("${urls[p.storage_path]}")` } : undefined}
+                onClick={() => (sel !== null ? toggle(p.id) : setOpen(i))} aria-label={sel !== null ? `Velg ${p.caption || 'bilde'}` : `Vis ${p.caption || 'bilde'}`} aria-pressed={sel !== null ? sel.includes(p.id) : undefined}>
+                {sel !== null && <span className="ptcheck">{sel.includes(p.id) && <Icon name="check" size={16} />}</span>}
                 {(p.caption || byLine(access, p.uploaded_by)) && <span>{p.caption}{byLine(access, p.uploaded_by) && <small className="pby">{cap(byLine(access, p.uploaded_by))} · {dShort(p.created_at)}</small>}</span>}
               </button>
-              <button className="ptedit" onClick={() => setSelected(p)} aria-label={mayEdit(access, p.uploaded_by) ? 'Endre bildetekst eller album' : 'Om bildet'}><Icon name="more" size={18} /></button>
+              {sel === null && <button className="ptedit" onClick={() => setSelected(p)} aria-label={mayEdit(access, p.uploaded_by) ? 'Endre bildetekst eller album' : 'Om bildet'}><Icon name="more" size={18} /></button>}
             </div>
           ))}
         </div>
