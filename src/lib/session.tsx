@@ -12,6 +12,8 @@ export interface FormerCabin {
 /** Byggeprosjekt der man er prosjektmedarbeider (håndverker): bare dokumenter og bilder */
 export interface WorkerCabin {
   cabin_id: string; label: string; number: number; gnr: number | null; bnr: number | null; ownership_id: string; fdv: boolean; project_name: string | null;
+  /** medarbeider = håndverker, kjoper = kjøper av hytte under oppføring */
+  kind?: 'medarbeider' | 'kjoper';
 }
 
 interface Me {

@@ -96,6 +96,7 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260930000000_prosjektmedarbeider.sql` | Prosjektmedarbeidere: håndverkere ser bare dokumenter og bilder i Min hytte for prosjektet, endrer bare egne opplastinger, mister tilgangen ved eierskifte | 30. sep 2026 |
 | `20260930010000_slett_hytte.sql` | Administrator kan slette en hytte (Rediger → «Slett hytta …») når eiere og prosjektmedarbeidere er fjernet | 30. sep 2026 |
 | `20260930020000_prosjektnavn.sql` | Prosjektnavn på hytter under bygging (vises for eier og prosjektmedarbeidere, fjernes ved eierskifte) | **Ikke kjørt ennå** |
+| `20260930030000_prosjektsamtale.sql` | Kjøper under oppføring (type på prosjektmedarbeider) og prosjektsamtale med bilder, PDF, push og «avtalt endring» | **Ikke kjørt ennå** |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 

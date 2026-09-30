@@ -912,3 +912,74 @@ reset role;
 select pg_temp.check('prosjektnavnet fjernes ved eierskifte',
   (select project_name from public.cabins where id = '10000000-0000-0000-0000-000000000047') is null
   and not exists (select 1 from public.cabin_workers where cabin_id = '10000000-0000-0000-0000-000000000047'));
+
+-- ---------------------------------------------------------------------
+-- Kjøper under oppføring og prosjektsamtale
+-- ---------------------------------------------------------------------
+reset role;
+insert into public.cabins (id, area, number, label, access) values ('10000000-0000-0000-0000-000000000077', 'morvika', 77, 'SB-77 · Mørvikåsen', 'full');
+insert into public.cabin_owners (cabin_id, user_id) values ('10000000-0000-0000-0000-000000000077', '00000000-0000-0000-0000-000000000101');
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.admin_add_worker('10000000-0000-0000-0000-000000000077', 'Sven Snekker', 'snekker@example.no');
+select public.admin_add_worker('10000000-0000-0000-0000-000000000077', 'Berit Kjøper', 'berit@example.no', null, 'kjoper');
+select pg_temp.check('personlisten viser kjøper under oppføring',
+  (select buyer_cabin_ids from public.admin_people() where email = 'berit@example.no') = array['10000000-0000-0000-0000-000000000077']::uuid[]
+  and (select buyer_cabin_ids from public.admin_people() where email = 'snekker@example.no') = '{}');
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values ('00000000-0000-0000-0000-000000000801', 'berit@example.no', '{}');
+select pg_temp.check('kjøperen kobles som kjøper ved innlogging',
+  (select kind from public.cabin_workers where user_id = '00000000-0000-0000-0000-000000000801') = 'kjoper');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+select public.my_ownership('10000000-0000-0000-0000-000000000077') as w77 \gset
+insert into public.project_messages (ownership_id, body) values (:'w77', 'Velkommen til prosjektet!');
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000701';
+insert into storage.objects (bucket_id, name) values ('hytte', :'w77' || '/chat/tak.pdf');
+insert into public.project_messages (ownership_id, body, attachments)
+  values (:'w77', 'Forslag: takvinduer i stua', jsonb_build_array(jsonb_build_object('path', :'w77' || '/chat/tak.pdf', 'name', 'Tak.pdf')));
+select pg_temp.check('medarbeider skriver i samtalen, og cabin_id fylles inn',
+  (select cabin_id from public.project_messages where body like 'Forslag%') = '10000000-0000-0000-0000-000000000077');
+select pg_temp.denied('kan ikke skrive i andres navn',
+  $$insert into public.project_messages (ownership_id, body, author_id) values ('$$ || :'w77' || $$', 'x', '00000000-0000-0000-0000-000000000101')$$);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000801';
+select pg_temp.check('kjøperen ser samtalen, vedlegget og hvem som er med',
+  (select count(*) from public.project_messages where ownership_id = :'w77') = 2
+  and (select count(*) from storage.objects where name = :'w77' || '/chat/tak.pdf') = 1
+  and (select string_agg(role, ',' order by role) from public.project_participants(:'w77')) = 'eier,kjoper,medarbeider');
+select pg_temp.check('kjøperen ser også dokumenter og bilder i Min hytte', public.is_cabin_worker(:'w77'));
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000701';
+select public.project_mark_change((select id from public.project_messages where body like 'Forslag%'), true);
+select pg_temp.denied('bare kjøperen kan bekrefte en avtalt endring',
+  $$select public.project_confirm_change((select id from public.project_messages where body like 'Forslag%'))$$);
+delete from public.project_messages where body like 'Forslag%';
+select pg_temp.check('avtalt endring kan ikke slettes', exists (select 1 from public.project_messages where body like 'Forslag%'));
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000801';
+select public.project_confirm_change((select id from public.project_messages where body like 'Forslag%'));
+select pg_temp.check('kjøperen bekrefter endringen',
+  (select change_confirmed_by from public.project_messages where body like 'Forslag%') = '00000000-0000-0000-0000-000000000801');
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000999';
+select pg_temp.check('uvedkommende ser ingen prosjektsamtale', not exists (select 1 from public.project_messages));
+select pg_temp.denied('uvedkommende kan ikke skrive', $$insert into public.project_messages (ownership_id, body) values ('$$ || :'w77' || $$', 'hei')$$);
+
+reset role;
+select pg_temp.check('push går til eier og kjøper, ikke til den som skrev',
+  (select array_agg(t.user_id order by t.user_id) from public.project_messages m, lateral public.push_targets('project_messages', m.id) t where m.body like 'Forslag%')
+   = array['00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-000000000801']::uuid[]);
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.admin_transfer('10000000-0000-0000-0000-000000000077', current_date, 'salg', '[{"name":"Berit Kjøper","email":"berit@example.no"}]'::jsonb, '', true);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000801';
+select pg_temp.check('etter overlevering eier kjøperen hytta og har samtalen som historikk',
+  (select count(*) from public.project_messages where ownership_id = public.my_ownership('10000000-0000-0000-0000-000000000077')) = 2
+  and not public.project_chat_open(public.my_ownership('10000000-0000-0000-0000-000000000077')));
+select pg_temp.denied('samtalen er skrivebeskyttet etter overlevering',
+  $$insert into public.project_messages (ownership_id, body) values (public.my_ownership('10000000-0000-0000-0000-000000000077'), 'hei')$$);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000701';
+select pg_temp.check('medarbeideren ser ikke samtalen etter overlevering', (select count(*) from public.project_messages where cabin_id = '10000000-0000-0000-0000-000000000077') = 0);
+reset role;

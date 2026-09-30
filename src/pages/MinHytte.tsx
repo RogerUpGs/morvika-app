@@ -9,8 +9,9 @@ import { Icon } from '../components/Icon';
 import { cabinName, type Cabin } from '../lib/types';
 import { FormerHytte } from './FormerHytte';
 import { makeZip, uniqueName, type ZipEntry } from '../lib/zip';
+import { ProjectChat, type Participant } from '../components/ProjectChat';
 
-type Tab = 'home' | 'dok' | 'foto' | 'regn';
+type Tab = 'home' | 'dok' | 'foto' | 'regn' | 'prat';
 const FOLDERS = ['Kontrakter', 'Forsikring', 'Tegninger', 'Kvitteringer'];
 // FDV-mal: forvaltning, drift og vedlikehold (ny hytte fra utbygger)
 const FDV_FOLDERS = ['Tegninger', 'Produktdata', 'Garantier', 'Veiledninger', 'Ferdigattest og samsvar', 'Vedlikehold', 'Kontrakter', 'Forsikring', 'Kvitteringer'];
@@ -68,6 +69,10 @@ export function MinHyttePage() {
   const [archive, setArchive] = useState<Arch[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [fdv, setFdv] = useState(false);
+  const [people, setPeople] = useState<Participant[]>([]);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatCount, setChatCount] = useState(0);
+  const buyer = jobSel?.kind === 'kjoper';
 
   const load = useCallback(async () => {
     if (!cabin) return;
@@ -76,7 +81,7 @@ export function MinHyttePage() {
     setOwn(o);
     if (!o) { setLoaded(true); return; }
     const none = Promise.resolve({ data: null });
-    const [d, a, p, l, ar, w2, n] = await Promise.all([
+    const [d, a, p, l, ar, w2, n, pp, co, cc] = await Promise.all([
       supabase.from('cabin_documents').select('id,folder,name,storage_path,size_bytes,created_at,uploaded_by').eq('ownership_id', o).order('created_at', { ascending: false }),
       supabase.from('cabin_albums').select('id,name,created_at').eq('ownership_id', o).order('created_at'),
       supabase.from('cabin_photos').select('id,album_id,caption,storage_path,created_at,uploaded_by').eq('ownership_id', o).order('created_at', { ascending: false }),
@@ -84,7 +89,14 @@ export function MinHyttePage() {
       jobSel ? none : supabase.from('cabin_archive').select('id,title,category,document_date,storage_path,created_at').eq('cabin_id', cabin.id).order('created_at', { ascending: false }),
       jobSel ? none : supabase.from('ownerships').select('fdv').eq('id', o).maybeSingle(),
       supabase.rpc('ownership_uploaders', { w: o }),
+      supabase.rpc('project_participants', { w: o }),
+      supabase.rpc('project_chat_open', { w: o }),
+      supabase.from('project_messages').select('id', { count: 'exact', head: true }).eq('ownership_id', o),
     ]);
+    // Prosjektsamtalen finnes når hytta har medarbeidere/kjøper, eller det allerede er skrevet noe
+    setPeople(((pp.data ?? []) as Participant[]));
+    setChatOpen(Boolean(co.data));
+    setChatCount((cc as { count?: number | null }).count ?? 0);
     setFdv(jobSel ? jobSel.fdv : Boolean((w2.data as { fdv?: boolean } | null)?.fdv));
     setDocs((d.data ?? []) as Doc[]); setAlbums((a.data ?? []) as Album[]); setPhotos((p.data ?? []) as Photo[]);
     setLedger(((l.data ?? []) as Entry[]).map((x) => ({ ...x, amount: Number(x.amount) })));
@@ -105,15 +117,16 @@ export function MinHyttePage() {
   if (!cabin) return <div className="empty">Du eier ingen hytte med Min hytte.</div>;
   if (loaded && !own) return <div className="empty">Min hytte kunne ikke åpnes. Ta kontakt med administrator.</div>;
 
-  const titles: Record<Tab, string> = { home: cabin.project_name || cabin.label, dok: 'Dokumentregister', foto: 'Fotoalbum', regn: 'Hytteregnskap' };
-  const others = ((worker ? ['dok', 'foto'] : ['dok', 'foto', 'regn']) as Tab[]).filter((t) => t !== tab);
+  const hasChat = people.some((p) => p.role !== 'eier') || chatCount > 0;
+  const titles: Record<Tab, string> = { home: cabin.project_name || cabin.label, dok: 'Dokumentregister', foto: 'Fotoalbum', regn: 'Hytteregnskap', prat: 'Prosjektsamtale' };
+  const others = ([...(hasChat ? ['prat'] : []), 'dok', 'foto', ...(worker ? [] : ['regn'])] as Tab[]).filter((t) => t !== tab);
 
   return (
     <>
       {picker}
       {tab === 'home' ? (
         <HytteHome cabin={cabin} name={me.profile?.full_name ?? ''} docs={docs} archive={archive} photos={photos} albums={albums} ledger={ledger} go={setTab}
-          own={own} fdv={fdv} reload={load} toast={toast} worker={worker} />
+          own={own} fdv={fdv} reload={load} toast={toast} worker={worker} buyer={buyer} chat={hasChat ? { people, count: chatCount, open: chatOpen } : null} />
       ) : (
         <div className="subhead">
           <button className="crumb" onClick={() => setTab('home')}><Icon name="back" size={18} />{cabin.project_name || cabin.label}</button>
@@ -124,15 +137,17 @@ export function MinHyttePage() {
       {!loaded && tab !== 'home' && <div className="empty">Henter …</div>}
       {loaded && own && tab === 'dok' && <Documents cabinId={cabin.id} own={own} docs={docs} archive={archive} reload={load} toast={toast} fdv={fdv} access={access} />}
       {loaded && own && tab === 'foto' && <Photos cabinId={cabin.id} own={own} albums={albums} photos={photos} reload={load} toast={toast} access={access} />}
+      {loaded && own && hasChat && tab === 'prat' && <ProjectChat own={own} uid={access.uid} participants={people} open={chatOpen} toast={toast} onChange={() => void load()} />}
       {loaded && own && !worker && tab === 'regn' && <Ledger cabinId={cabin.id} own={own} ledger={ledger} reload={load} toast={toast} label={cabin.label} />}
     </>
   );
 }
 
 /* ---------- Forsiden for hytta ---------- */
-function HytteHome({ cabin, name, docs, archive, photos, albums, ledger, go, own, fdv, reload, toast, worker }: {
+function HytteHome({ cabin, name, docs, archive, photos, albums, ledger, go, own, fdv, reload, toast, worker, buyer, chat }: {
   cabin: Cabin; name: string; docs: Doc[]; archive: Arch[]; photos: Photo[]; albums: Album[]; ledger: Entry[]; go: (t: Tab) => void;
-  own: string | null; fdv: boolean; reload: () => Promise<void>; toast: (m: string) => void; worker: boolean;
+  own: string | null; fdv: boolean; reload: () => Promise<void>; toast: (m: string) => void; worker: boolean; buyer: boolean;
+  chat: { people: Participant[]; count: number; open: boolean } | null;
 }) {
   const yr = new Date().getFullYear();
   const thisYr = ledger.filter((x) => x.entry_date.startsWith(String(yr)));
@@ -148,12 +163,22 @@ function HytteHome({ cabin, name, docs, archive, photos, albums, ledger, go, own
         </svg>
         <div className="eyebrow">{worker || cabin.project_name ? 'Byggeprosjekt' : 'Mørvika hytteområde'}</div>
         <h2>{cabin.project_name || cabin.label}</h2>
-        <div className="sub">{cabin.project_name ? `${cabin.label} · ` : ''}{cabin.gnr ? `Gnr ${cabin.gnr} / bnr ${cabin.bnr ?? '–'} · ` : ''}{worker ? `Prosjektmedarbeider: ${name}` : name}</div>
-        <div className="lockchip"><Icon name="lock" size={15} />{worker
+        <div className="sub">{cabin.project_name ? `${cabin.label} · ` : ''}{cabin.gnr ? `Gnr ${cabin.gnr} / bnr ${cabin.bnr ?? '–'} · ` : ''}{buyer ? `Kjøper: ${name}` : worker ? `Prosjektmedarbeider: ${name}` : name}</div>
+        <div className="lockchip"><Icon name="lock" size={15} />{buyer
+          ? 'Du følger byggingen: dokumenter, bilder og prosjektsamtalen. Du kan endre det du selv laster opp.'
+          : worker
           ? 'Du ser dokumenter og bilder for prosjektet, og kan endre det du selv laster opp.'
           : 'Privat. Bare hyttas eiere har tilgang.'}</div>
       </section>
       <div className="apps">
+        {chat && (
+          <button className="card apptile" onClick={() => go('prat')}>
+            <span className="ic"><Icon name="chat" size={24} /></span>
+            <div><h3>Prosjektsamtale</h3><div className="meta">{chat.count} {chat.count === 1 ? 'melding' : 'meldinger'}{chat.open ? '' : ' · lukket'}</div></div>
+            <div className="pv">{chat.people.map((p) => <span key={p.id} className="ln">{p.full_name} <span className="muted">· {p.role === 'eier' ? 'eier' : p.role === 'kjoper' ? 'kjøper' : 'håndverker'}</span></span>).slice(0, 4)}</div>
+            <span className="go">Åpne <Icon name="chev" size={16} /></span>
+          </button>
+        )}
         <button className="card apptile" onClick={() => go('dok')}>
           <span className="ic"><Icon name="doc" size={24} /></span>
           <div><h3>Dokumentregister</h3><div className="meta">{docs.length + archive.length} dokumenter i {folders} {folders === 1 ? 'mappe' : 'mapper'}</div></div>

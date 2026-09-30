@@ -93,7 +93,8 @@ export function Shell() {
           {[...me.cabins, ...me.workerCabins].map(cabinName).join(', ')}
           <div className="rolechips" style={{ marginTop: 6 }}>
             {me.cabins.length > 0 && <span className="pill">Hytteeier</span>}
-            {me.workerCabins.length > 0 && <span className="pill">Prosjektmedarbeider</span>}
+            {me.workerCabins.some((w) => w.kind !== 'kjoper') && <span className="pill">Prosjektmedarbeider</span>}
+            {me.workerCabins.some((w) => w.kind === 'kjoper') && <span className="pill">Kjøper under oppføring</span>}
             {me.roles.map((r) => <span key={r} className="pill">{ROLE_LABEL[r]}</span>)}
           </div>
           <div className="sideactions">

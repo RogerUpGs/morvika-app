@@ -28,6 +28,8 @@ interface Person {
   sms_cabin_ids?: string[];
   /** Byggeprosjekter der personen er prosjektmedarbeider */
   worker_cabin_ids?: string[];
+  /** Hytter der personen er kjøper under oppføring (en del av worker_cabin_ids) */
+  buyer_cabin_ids?: string[];
 }
 interface OwnerDraft { key: string; id?: string; name: string; email: string; phone: string; status?: PersonStatus }
 
@@ -47,6 +49,9 @@ const emailOk = (e: string) => e.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.t
 
 const isSms = (p: Person, cabinId: string) => (p.sms_cabin_ids ?? []).includes(cabinId);
 const isWorker = (p: Person, cabinId: string) => (p.worker_cabin_ids ?? []).includes(cabinId);
+const isBuyer = (p: Person, cabinId: string) => (p.buyer_cabin_ids ?? []).includes(cabinId);
+type WorkerKind = 'medarbeider' | 'kjoper';
+const KIND_LABEL: Record<WorkerKind, string> = { medarbeider: 'Håndverker', kjoper: 'Kjøper' };
 
 function StatusPill({ s }: { s: PersonStatus }) {
   return <span className={`pill st-${s}`}>{STATUS_LABEL[s]}</span>;
@@ -145,7 +150,8 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
 
       <div ref={formRef}>
         {transfer ? (
-          <TransferPanel key={transfer.id} cabin={transfer} sellers={ownersOf(transfer.id)} onDone={reload} onClose={() => setTransfer(null)} />
+          <TransferPanel key={transfer.id} cabin={transfer} sellers={ownersOf(transfer.id)} onDone={reload} onClose={() => setTransfer(null)}
+            projectBuyers={people.filter((p) => isBuyer(p, transfer.id)).map((p) => ({ name: p.full_name, email: p.email ?? '', phone: p.phone ?? '' }))} />
         ) : showQuick ? (
           <CabinForm key={editing?.id ?? 'ny'} cabins={cabins} editing={editing} owners={editing ? ownersOf(editing.id) : []}
             workers={editing ? people.filter((p) => isWorker(p, editing.id)) : []} reload={reload}
@@ -197,7 +203,7 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
                       )}
                       {people.some((p) => isWorker(p, c.id)) && (
                         <div className="muted workerline" title="Prosjektmedarbeidere ser bare dokumenter og bilder i Min hytte">
-                          Prosjekt: {people.filter((p) => isWorker(p, c.id)).map((p) => p.full_name).join(', ')}
+                          Prosjekt: {people.filter((p) => isWorker(p, c.id)).map((p) => p.full_name + (isBuyer(p, c.id) ? ' (kjøper)' : '')).join(', ')}
                         </div>
                       )}
                     </td>
@@ -574,7 +580,7 @@ function WorkersTab({ cabins, people, reload }: { cabins: AdminCabin[]; people: 
     setBusy(`${w.id}:${c.id}`);
     const { error } = on
       ? await supabase.rpc('admin_remove_worker', { p_cabin: c.id, p_person: w.id })
-      : await supabase.rpc('admin_add_worker', { p_cabin: c.id, p_name: w.full_name, p_email: w.email, p_phone: w.phone });
+      : await supabase.rpc('admin_add_worker', { p_cabin: c.id, p_name: w.full_name, p_email: w.email, p_phone: w.phone, ...((w.buyer_cabin_ids ?? []).length ? { p_kind: 'kjoper' } : {}) });
     setBusy(null);
     if (error) { toast(error.message.includes('function') ? 'Databasen må oppdateres først (prosjektmedarbeider).' : 'Endringen ble ikke lagret. Prøv igjen.'); return; }
     toast(`${w.full_name}: ${cabinName(c)} ${on ? 'fjernet' : 'lagt til'}.`);
@@ -591,8 +597,8 @@ function WorkersTab({ cabins, people, reload }: { cabins: AdminCabin[]; people: 
   return (
     <>
       <div className="head-row">
-        <p className="lede">Håndverkere på byggeprosjektene dine. De ser bare dokumenter og bilder i Min hytte for prosjektene som er krysset av,
-          kan laste opp, og kan bare endre det de selv har lastet opp. Tilgangen forsvinner også ved eierskifte.</p>
+        <p className="lede">Håndverkere og kjøpere på byggeprosjektene dine. De ser dokumenter, bilder og prosjektsamtalen i Min hytte for prosjektene som er krysset av,
+          kan laste opp, og kan bare endre det de selv har lastet opp. Tilgangen forsvinner ved overlevering.</p>
         <button className="btn primary" onClick={() => setAdding((v) => !v)}><Icon name="plus" size={18} />Ny prosjektmedarbeider</button>
       </div>
       <div className="card projmail">
@@ -626,9 +632,9 @@ function WorkersTab({ cabins, people, reload }: { cabins: AdminCabin[]; people: 
           <section key={w.id} className="card wcard">
             <div className="wcard-h">
               <div><b>{w.full_name}</b><div className="muted">{w.email}{w.phone ? ` · ${w.phone}` : ''}</div></div>
-              <StatusPill s={w.status} />
+              <span className="wpills">{(w.buyer_cabin_ids ?? []).length > 0 && <span className="pill kjoperpill">Kjøper</span>}<StatusPill s={w.status} /></span>
             </div>
-            <div className="wcard-l">Tilgang til prosjekter</div>
+            <div className="wcard-l">{(w.buyer_cabin_ids ?? []).length ? 'Kjøper av' : 'Tilgang til prosjekter'}</div>
             <div className="rolechips">
               {projects.map((c) => {
                 const on = (w.worker_cabin_ids ?? []).includes(c.id);
@@ -657,6 +663,7 @@ function NewWorkerForm({ projects, onDone, onCancel }: { projects: AdminCabin[];
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [picked, setPicked] = useState<string[]>(projects.length === 1 ? [projects[0].id] : []);
+  const [kind, setKind] = useState<WorkerKind>('medarbeider');
   const [busy, setBusy] = useState(false);
 
   async function submit(e: FormEvent) {
@@ -666,7 +673,7 @@ function NewWorkerForm({ projects, onDone, onCancel }: { projects: AdminCabin[];
     setBusy(true);
     let status = ''; let failed = 0;
     for (const id of picked) {
-      const { data, error } = await supabase.rpc('admin_add_worker', { p_cabin: id, p_name: name, p_email: email, p_phone: phone });
+      const { data, error } = await supabase.rpc('admin_add_worker', { p_cabin: id, p_name: name, p_email: email, p_phone: phone, ...(kind === 'kjoper' ? { p_kind: 'kjoper' } : {}) });
       if (error) failed++; else status = String(data);
     }
     setBusy(false);
@@ -679,10 +686,22 @@ function NewWorkerForm({ projects, onDone, onCancel }: { projects: AdminCabin[];
 
   return (
     <form className="card form" onSubmit={submit}>
+      <div className="field full">Type
+        <div className="seg small" role="radiogroup" aria-label="Type">
+          {(['medarbeider', 'kjoper'] as WorkerKind[]).map((k) => (
+            <button type="button" key={k} role="radio" aria-checked={kind === k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>
+              {k === 'medarbeider' ? 'Håndverker' : 'Kjøper under oppføring'}
+            </button>
+          ))}
+        </div>
+        <small className="hint">{kind === 'kjoper'
+          ? 'Kjøperen følger byggingen: ser dokumenter, bilder og prosjektsamtalen. Ved overlevering blir kjøperen foreslått som ny eier.'
+          : 'Håndverkeren ser dokumenter og bilder og er med i prosjektsamtalen.'}</small>
+      </div>
       <label className="field" htmlFor="nw-name">Fullt navn<input id="nw-name" type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="F.eks. Sven Snekker (Snekker AS)" /></label>
       <label className="field" htmlFor="nw-email">E-post (brukes til innlogging)<input id="nw-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
       <label className="field" htmlFor="nw-phone">Mobil<input id="nw-phone" type="text" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
-      <div className="field full">Tilgang til prosjekter
+      <div className="field full">{kind === 'kjoper' ? 'Kjøper av' : 'Tilgang til prosjekter'}
         <div className="checks">
           {projects.map((c) => (
             <label key={c.id} className="check"><input type="checkbox" checked={picked.includes(c.id)}
@@ -707,12 +726,13 @@ function WorkersSection({ cabin, workers, reload }: { cabin: AdminCabin; workers
   const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [kind, setKind] = useState<WorkerKind>('medarbeider');
 
   async function add() {
     if (!name.trim() || !email.trim()) { toast('Skriv inn navn og e-post.'); return; }
     if (!emailOk(email)) { toast('E-postadressen ser ikke riktig ut.'); return; }
     setBusy(true);
-    const { data, error } = await supabase.rpc('admin_add_worker', { p_cabin: cabin.id, p_name: name, p_email: email, p_phone: phone });
+    const { data, error } = await supabase.rpc('admin_add_worker', { p_cabin: cabin.id, p_name: name, p_email: email, p_phone: phone, ...(kind === 'kjoper' ? { p_kind: 'kjoper' } : {}) });
     setBusy(false);
     if (error) { toast(error.message.includes('function') ? 'Databasen må oppdateres først (prosjektmedarbeider).' : 'Medarbeideren ble ikke lagt til. Prøv igjen.'); return; }
     toast(data === 'koblet'
@@ -731,7 +751,7 @@ function WorkersSection({ cabin, workers, reload }: { cabin: AdminCabin; workers
 
   return (
     <fieldset className="workers">
-      <legend>Prosjektmedarbeidere</legend>
+      <legend>Prosjektmedarbeidere og kjøper</legend>
       <p className="muted" style={{ margin: '0 0 10px', fontSize: 13 }}>
         Håndverkere på byggeprosjektet. De ser bare dokumenter og bilder i Min hytte for denne hytta, kan laste opp,
         og kan bare endre det de selv har lastet opp. Tilgangen forsvinner ved eierskifte, eller når du fjerner dem.
@@ -741,6 +761,7 @@ function WorkersSection({ cabin, workers, reload }: { cabin: AdminCabin; workers
           {workers.map((p) => (
             <div key={p.id} className="workerrow">
               <span><b>{p.full_name}</b> <span className="muted">{p.email}{p.phone ? ` · ${p.phone}` : ''}</span></span>
+              <span className={`pill ${isBuyer(p, cabin.id) ? 'kjoperpill' : ''}`}>{KIND_LABEL[isBuyer(p, cabin.id) ? 'kjoper' : 'medarbeider']}</span>
               <StatusPill s={p.status} />
               {confirm === p.id
                 ? <span className="confirm">Fjerne tilgangen?<button type="button" className="btn small danger-btn" onClick={() => void remove(p)}>Fjern</button><button type="button" className="btn small ghost" onClick={() => setConfirm(null)}>Avbryt</button></span>
@@ -754,6 +775,11 @@ function WorkersSection({ cabin, workers, reload }: { cabin: AdminCabin; workers
           <label className="field" htmlFor="w-name">Fullt navn<input id="w-name" type="text" autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} placeholder="F.eks. Sven Snekker" /></label>
           <label className="field" htmlFor="w-email">E-post (brukes til innlogging)<input id="w-email" type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={!emailOk(email)} /></label>
           <label className="field" htmlFor="w-phone">Mobil<input id="w-phone" type="text" inputMode="tel" autoComplete="off" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
+          <label className="field" htmlFor="w-kind">Type
+            <select id="w-kind" value={kind} onChange={(e) => setKind(e.target.value as WorkerKind)}>
+              <option value="medarbeider">Håndverker</option><option value="kjoper">Kjøper under oppføring</option>
+            </select>
+          </label>
           <div className="ownerrow-end">
             <button type="button" className="btn small primary" disabled={busy} onClick={() => void add()}>{busy ? 'Legger til …' : 'Legg til'}</button>
             <button type="button" className="btn small ghost" onClick={() => setAdding(false)}>Avbryt</button>

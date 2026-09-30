@@ -58,7 +58,7 @@ export function Home({ go }: { go: (r: string) => void }) {
     <>
       <div className="hello">
         <h2>{greeting()}, {firstName(me.profile?.full_name ?? '')}</h2>
-        <p>{me.cabins.length ? `${me.cabins.map((c) => c.label).join(', ')} · ` : ''}{!me.isResident && me.workerCabins.length ? 'Prosjektmedarbeider · ' : ''}{place}</p>
+        <p>{me.cabins.length ? `${me.cabins.map((c) => c.label).join(', ')} · ` : ''}{!me.isResident && me.workerCabins.length ? (me.workerCabins.every((w) => w.kind === 'kjoper') ? 'Kjøper under oppføring · ' : 'Prosjektmedarbeider · ') : ''}{place}</p>
       </div>
       {sendersFor(me.roles).some((s) => s !== 'admin') && (
         <button className="fieldbtn" onClick={() => go('del')}>
@@ -67,7 +67,7 @@ export function Home({ go }: { go: (r: string) => void }) {
         </button>
       )}
       <InstallPrompt />
-      {me.isResident && <PushPrompt />}
+      <PushPrompt />
       <div className="tiles">
         {tiles.map((it) => (
           <button key={it.key} className={`tile2 t-${it.key} ${it.key === 'varsler' && akutt ? 'akutt' : ''}`} onClick={() => go(it.key)}>

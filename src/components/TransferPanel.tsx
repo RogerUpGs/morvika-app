@@ -15,16 +15,18 @@ const today = () => new Date().toISOString().slice(0, 10);
 const plus90 = (d: string) => { const x = new Date(`${d}T12:00:00`); x.setDate(x.getDate() + 90); return x.toISOString().slice(0, 10); };
 
 /** Administrasjon: registrer salg eller overdragelse i familien for en hytte */
-export function TransferPanel({ cabin, sellers, onDone, onClose }: {
+export function TransferPanel({ cabin, sellers, onDone, onClose, projectBuyers = [] }: {
   cabin: { id: string; label: string; address: string | null };
   sellers: { id: string; full_name: string; status: string }[];
   onDone: () => Promise<void>; onClose: () => void;
+  /** Kjøper(e) under oppføring: foreslås som nye eiere ved overlevering fra utbygger */
+  projectBuyers?: { name: string; email: string; phone: string }[];
 }) {
   const toast = useToast();
-  const [mode, setMode] = useState<Mode>('salg');
+  const [mode, setMode] = useState<Mode>(projectBuyers.length ? 'utbygger' : 'salg');
   const kind: Kind = mode === 'familie' ? 'familie' : 'salg';
   const [date, setDate] = useState(today());
-  const [rows, setRows] = useState<Row[]>([newRow()]);
+  const [rows, setRows] = useState<Row[]>(projectBuyers.length ? projectBuyers.map((b) => ({ ...newRow(), ...b })) : [newRow()]);
   const [note, setNote] = useState('');
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
