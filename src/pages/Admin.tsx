@@ -458,6 +458,7 @@ function CabinForm({ cabins, editing, owners, workers, reload, note: initialNote
       </label>
 
       {error && <p className="err" role="alert">{error}</p>}
+      {editing && <DeleteCabin cabin={editing} onDeleted={async () => { onClose(); await onSaved(); }} />}
       <div className="actions">
         {editing ? (
           <button className="btn primary" disabled={busy}>{busy ? 'Lagrer …' : 'Lagre endringer'}</button>
@@ -469,6 +470,53 @@ function CabinForm({ cabins, editing, owners, workers, reload, note: initialNote
         )}
       </div>
     </form>
+  );
+}
+
+/* ---------- Slette en hytte (registrert ved en feil, eller skal ikke brukes) ---------- */
+interface Content { owners: number; workers: number; documents: number; photos: number; ledger: number; archive: number; transfers: number }
+function DeleteCabin({ cabin, onDeleted }: { cabin: AdminCabin; onDeleted: () => Promise<void> }) {
+  const toast = useToast();
+  const [content, setContent] = useState<Content | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function start() {
+    setBusy(true);
+    const { data, error } = await supabase.rpc('admin_cabin_content', { p_cabin: cabin.id });
+    const row = (Array.isArray(data) ? data[0] : data) as Content | undefined;
+    setBusy(false);
+    if (error || !row) { toast(error?.message.includes('function') ? 'Databasen må oppdateres først (slett hytte).' : 'Kunne ikke sjekke hytta. Prøv igjen.'); return; }
+    setContent(row);
+  }
+  async function remove() {
+    setBusy(true);
+    const { error } = await supabase.rpc('admin_delete_cabin', { p_cabin: cabin.id });
+    setBusy(false);
+    if (error) { toast(error.message.includes('Fjern') ? 'Fjern eiere og prosjektmedarbeidere først.' : 'Hytta ble ikke slettet. Prøv igjen.'); return; }
+    toast(`${cabin.label} er slettet.`);
+    await onDeleted();
+  }
+
+  if (!content) return (
+    <div className="delcabin"><button type="button" className="linkbtn" disabled={busy} onClick={() => void start()}>Slett hytta …</button></div>
+  );
+  const blocked = content.owners + content.workers > 0;
+  const parts = [
+    [content.documents, 'dokument', 'dokumenter'], [content.photos, 'bilde', 'bilder'], [content.ledger, 'regnskapspost', 'regnskapsposter'],
+    [content.archive, 'arkivdokument', 'arkivdokumenter'], [content.transfers, 'eierskifte', 'eierskifter'],
+  ].filter(([n]) => (n as number) > 0).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`);
+  return (
+    <div className="delcabin card">
+      {blocked ? (
+        <p style={{ margin: 0 }}><b>{cabin.label} har {content.owners ? `${content.owners} ${content.owners === 1 ? 'eier' : 'eiere'}` : ''}{content.owners && content.workers ? ' og ' : ''}{content.workers ? `${content.workers} ${content.workers === 1 ? 'prosjektmedarbeider' : 'prosjektmedarbeidere'}` : ''}.</b> Fjern dem først: eiere med «Fjern» og «Lagre endringer», prosjektmedarbeidere med «Fjern» i listen over. Deretter kan hytta slettes.</p>
+      ) : (
+        <p style={{ margin: 0 }}><b>Slette {cabin.label} for godt?</b> {parts.length ? `Dette sletter også ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} og ${parts[parts.length - 1]}` : parts[0]}.` : 'Hytta har ikke noe innhold.'} Det kan ikke angres.</p>
+      )}
+      <div className="actions">
+        <button type="button" className="btn small ghost" onClick={() => setContent(null)}>Avbryt</button>
+        {!blocked && <button type="button" className="btn small danger-fill" disabled={busy} onClick={() => void remove()}>{busy ? 'Sletter …' : 'Ja, slett hytta'}</button>}
+      </div>
+    </div>
   );
 }
 

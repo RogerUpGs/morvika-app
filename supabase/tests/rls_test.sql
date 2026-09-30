@@ -867,3 +867,32 @@ reset role;
 select pg_temp.check('bildene fra medarbeideren følger med til kjøper',
   (select count(*) from public.cabin_photos p join public.ownerships w on w.id = p.ownership_id
     where w.cabin_id = '10000000-0000-0000-0000-000000000012' and w.ends_on is null and p.uploaded_by = '00000000-0000-0000-0000-000000000701') = 1);
+
+-- ---------------------------------------------------------------------
+-- Slette hytte
+-- ---------------------------------------------------------------------
+reset role;
+insert into public.cabins (id, area, number, label, access) values ('10000000-0000-0000-0000-000000000099', 'morvika', 99, 'Mørvikåsen 19 (feil)', 'full');
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.admin_add_owner('10000000-0000-0000-0000-000000000099', 'Prosjekt', 'prosjekt@example.no');
+reset role;
+insert into public.ownerships (cabin_id) values ('10000000-0000-0000-0000-000000000099');
+insert into public.cabin_documents (cabin_id, ownership_id, name, storage_path)
+  select '10000000-0000-0000-0000-000000000099', id, 'Tegning.pdf', id || '/tegning.pdf' from public.ownerships where cabin_id = '10000000-0000-0000-0000-000000000099';
+set role authenticated;
+select pg_temp.check('innholdet på hytta telles før sletting',
+  (select owners = 1 and documents = 1 and photos = 0 from public.admin_cabin_content('10000000-0000-0000-0000-000000000099')));
+select pg_temp.fails('hytte med eiere kan ikke slettes', $$select public.admin_delete_cabin('10000000-0000-0000-0000-000000000099')$$);
+select public.admin_remove_owner('10000000-0000-0000-0000-000000000099', (select id from public.pending_people where email = 'prosjekt@example.no'));
+select pg_temp.denied('bare administrator kan slette hytter',
+  $$set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000047'; select public.admin_delete_cabin('10000000-0000-0000-0000-000000000099')$$);
+select public.admin_delete_cabin('10000000-0000-0000-0000-000000000099') as del \gset
+reset role;
+select pg_temp.check('hytta er slettet, med innhold, og filen er lagt til rydding',
+  :'del' = 'Mørvikåsen 19 (feil)'
+  and not exists (select 1 from public.cabins where number = 99)
+  and not exists (select 1 from public.cabin_documents where name = 'Tegning.pdf')
+  and not exists (select 1 from public.ownerships o where not exists (select 1 from public.cabins c where c.id = o.cabin_id))
+  and exists (select 1 from public.storage_trash where path like '%/tegning.pdf')
+  and not exists (select 1 from public.pending_people where email = 'prosjekt@example.no'));
