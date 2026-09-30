@@ -788,3 +788,4 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area
 .projmail>span{display:grid;gap:3px}
 .projmail small{font-size:12.5px}
 .projmail-f{width:100%;display:grid;gap:8px}
+.projpill{display:inline-block;margin-top:4px;font-size:12px;font-weight:600;color:var(--primary);background:var(--primary-soft);border-radius:999px;padding:1px 8px}

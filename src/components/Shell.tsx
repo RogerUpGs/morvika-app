@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { useMe } from '../lib/session';
 import { useIsPhone, useRoute, useTheme } from '../lib/ui';
-import { ROLE_LABEL } from '../lib/types';
+import { ROLE_LABEL, cabinName } from '../lib/types';
 import { Icon, Logo } from './Icon';
 import { useNavItems } from '../lib/nav';
 import { Home } from '../pages/Home';
@@ -90,7 +90,7 @@ export function Shell() {
         </nav>
         <div className="who">
           <b>{me.profile?.full_name || me.session?.user.email}</b>
-          {[...me.cabins.map((c) => c.label), ...me.workerCabins.map((w) => w.label)].join(', ')}
+          {[...me.cabins, ...me.workerCabins].map(cabinName).join(', ')}
           <div className="rolechips" style={{ marginTop: 6 }}>
             {me.cabins.length > 0 && <span className="pill">Hytteeier</span>}
             {me.workerCabins.length > 0 && <span className="pill">Prosjektmedarbeider</span>}

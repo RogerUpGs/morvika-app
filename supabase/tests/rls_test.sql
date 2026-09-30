@@ -896,3 +896,19 @@ select pg_temp.check('hytta er slettet, med innhold, og filen er lagt til ryddin
   and not exists (select 1 from public.ownerships o where not exists (select 1 from public.cabins c where c.id = o.cabin_id))
   and exists (select 1 from public.storage_trash where path like '%/tegning.pdf')
   and not exists (select 1 from public.pending_people where email = 'prosjekt@example.no'));
+
+-- ---------------------------------------------------------------------
+-- Prosjektnavn
+-- ---------------------------------------------------------------------
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+update public.cabins set project_name = 'Prosjekt 3 – Tomt C' where id = '10000000-0000-0000-0000-000000000047';
+select public.admin_add_worker('10000000-0000-0000-0000-000000000047', 'Sven Snekker', 'snekker@example.no');
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000701';
+select pg_temp.check('medarbeideren ser prosjektnavnet', (select project_name from public.my_worker_cabins()) = 'Prosjekt 3 – Tomt C');
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.admin_transfer('10000000-0000-0000-0000-000000000047', current_date, 'salg', '[{"name":"Kjøper","email":"k47@example.no"}]'::jsonb, '', true);
+reset role;
+select pg_temp.check('prosjektnavnet fjernes ved eierskifte',
+  (select project_name from public.cabins where id = '10000000-0000-0000-0000-000000000047') is null
+  and not exists (select 1 from public.cabin_workers where cabin_id = '10000000-0000-0000-0000-000000000047'));

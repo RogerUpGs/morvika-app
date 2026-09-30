@@ -6,7 +6,7 @@ import { dShort } from '../lib/format';
 import { shrinkImage, toDrafts, uploadImages, useSignedUrls, type Draft } from '../lib/images';
 import { Lightbox } from '../components/Media';
 import { Icon } from '../components/Icon';
-import type { Cabin } from '../lib/types';
+import { cabinName, type Cabin } from '../lib/types';
 import { FormerHytte } from './FormerHytte';
 import { makeZip, uniqueName, type ZipEntry } from '../lib/zip';
 
@@ -53,7 +53,7 @@ export function MinHyttePage() {
   const jobSel = cabinId.startsWith('job:') ? jobs.find((j) => `job:${j.cabin_id}` === cabinId) ?? null : null;
   const jobCabin = useMemo<Cabin | undefined>(() => jobSel ? {
     id: jobSel.cabin_id, area: 'morvika', number: jobSel.number, label: jobSel.label, gnr: jobSel.gnr, bnr: jobSel.bnr,
-    vel_member: false, va_member: false, vei_member: false, access: 'full',
+    vel_member: false, va_member: false, vei_member: false, access: 'full', project_name: jobSel.project_name,
   } : undefined, [jobSel]);
   const worker = Boolean(jobSel);
   const cabin = formerSel ? undefined : jobCabin ?? cabins.find((c) => c.id === cabinId) ?? cabins[0];
@@ -96,8 +96,8 @@ export function MinHyttePage() {
 
   const picker = cabins.length + me.former.length + jobs.length > 1 && (tab === 'home' || formerSel) && (
     <div className="chips" role="group" aria-label="Velg hytte">
-      {cabins.map((c) => <button key={c.id} className={`chip ${!jobSel && c.id === cabin?.id ? 'on' : ''}`} onClick={() => { setCabinId(c.id); setTab('home'); }}>{c.label}</button>)}
-      {jobs.map((j) => <button key={j.cabin_id} className={`chip ${jobSel?.cabin_id === j.cabin_id ? 'on' : ''}`} onClick={() => { setCabinId(`job:${j.cabin_id}`); setTab('home'); }}>Prosjekt: {j.label}</button>)}
+      {cabins.map((c) => <button key={c.id} className={`chip ${!jobSel && c.id === cabin?.id ? 'on' : ''}`} onClick={() => { setCabinId(c.id); setTab('home'); }}>{cabinName(c)}</button>)}
+      {jobs.map((j) => <button key={j.cabin_id} className={`chip ${jobSel?.cabin_id === j.cabin_id ? 'on' : ''}`} onClick={() => { setCabinId(`job:${j.cabin_id}`); setTab('home'); }}>{j.project_name ? cabinName(j) : `Prosjekt: ${j.label}`}</button>)}
       {me.former.map((f) => <button key={f.ownership_id} className={`chip ${formerSel?.ownership_id === f.ownership_id ? 'on' : ''}`} onClick={() => setCabinId(`old:${f.ownership_id}`)}>Tidligere: {f.label}</button>)}
     </div>
   );
@@ -105,7 +105,7 @@ export function MinHyttePage() {
   if (!cabin) return <div className="empty">Du eier ingen hytte med Min hytte.</div>;
   if (loaded && !own) return <div className="empty">Min hytte kunne ikke åpnes. Ta kontakt med administrator.</div>;
 
-  const titles: Record<Tab, string> = { home: cabin.label, dok: 'Dokumentregister', foto: 'Fotoalbum', regn: 'Hytteregnskap' };
+  const titles: Record<Tab, string> = { home: cabin.project_name || cabin.label, dok: 'Dokumentregister', foto: 'Fotoalbum', regn: 'Hytteregnskap' };
   const others = ((worker ? ['dok', 'foto'] : ['dok', 'foto', 'regn']) as Tab[]).filter((t) => t !== tab);
 
   return (
@@ -116,7 +116,7 @@ export function MinHyttePage() {
           own={own} fdv={fdv} reload={load} toast={toast} worker={worker} />
       ) : (
         <div className="subhead">
-          <button className="crumb" onClick={() => setTab('home')}><Icon name="back" size={18} />{cabin.label}</button>
+          <button className="crumb" onClick={() => setTab('home')}><Icon name="back" size={18} />{cabin.project_name || cabin.label}</button>
           <h2 className="serif">{titles[tab]}</h2>
           <div className="switch">{others.map((t) => <button key={t} className="chip" onClick={() => setTab(t)}>{titles[t]}</button>)}</div>
         </div>
@@ -146,9 +146,9 @@ function HytteHome({ cabin, name, docs, archive, photos, albums, ledger, go, own
         <svg className="waves" width="260" height="120" viewBox="0 0 34 16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden="true">
           <path d="M1 6c3-2 5-2 7.5 0s5 2 7.5 0 5-2 7.5 0 5 2 7.5 0" /><path d="M1 11c3-2 5-2 7.5 0s5 2 7.5 0 5-2 7.5 0 5 2 7.5 0" />
         </svg>
-        <div className="eyebrow">{worker ? 'Byggeprosjekt' : 'Mørvika hytteområde'}</div>
-        <h2>{cabin.label}</h2>
-        <div className="sub">{cabin.gnr ? `Gnr ${cabin.gnr} / bnr ${cabin.bnr ?? '–'} · ` : ''}{worker ? `Prosjektmedarbeider: ${name}` : name}</div>
+        <div className="eyebrow">{worker || cabin.project_name ? 'Byggeprosjekt' : 'Mørvika hytteområde'}</div>
+        <h2>{cabin.project_name || cabin.label}</h2>
+        <div className="sub">{cabin.project_name ? `${cabin.label} · ` : ''}{cabin.gnr ? `Gnr ${cabin.gnr} / bnr ${cabin.bnr ?? '–'} · ` : ''}{worker ? `Prosjektmedarbeider: ${name}` : name}</div>
         <div className="lockchip"><Icon name="lock" size={15} />{worker
           ? 'Du ser dokumenter og bilder for prosjektet, og kan endre det du selv laster opp.'
           : 'Privat. Bare hyttas eiere har tilgang.'}</div>

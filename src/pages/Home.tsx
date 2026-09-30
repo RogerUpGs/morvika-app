@@ -8,7 +8,7 @@ import { useBadges } from '../lib/badges';
 import { useTaskCount } from '../lib/tasks';
 import { PushPrompt } from '../components/PushCard';
 import { InstallPrompt } from '../components/InstallPrompt';
-import { sendersFor } from '../lib/types';
+import { cabinName, sendersFor } from '../lib/types';
 import { nextEvent } from './Events';
 
 /** Telefonens startside: store knapper, to i bredden. */
@@ -39,7 +39,7 @@ export function Home({ go }: { go: (r: string) => void }) {
   }, [me.session?.user.id]);
 
   const sub: Record<string, string> = {
-    minhytte: me.cabins[0]?.label ?? (me.workerCabins.length ? `Prosjekt: ${me.workerCabins.map((w) => w.label).join(', ')}` : ''),
+    minhytte: me.cabins[0] ? cabinName(me.cabins[0]) : (me.workerCabins.length ? `Prosjekt: ${me.workerCabins.map(cabinName).join(', ')}` : ''),
     chat: badges.newPosts ? `${badges.newPosts} ${badges.newPosts === 1 ? 'nytt innlegg' : 'nye innlegg'}` : 'Del bilder og nytt',
     nyheter: unreadNews ? `${unreadNews} ${unreadNews === 1 ? 'ny' : 'nye'}` : lastNews ? `Siste ${dShort(lastNews)}` : me.veilagOnly ? 'Fra Veilaget' : 'Fra styret og grunneier',
     varsler: badges.openAlerts.length ? `${badges.openAlerts.length} venter på deg` : 'Ingen nye',

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useMe } from '../lib/session';
 import { useToast } from '../lib/ui';
 import { dShort } from '../lib/format';
-import { ROLE_LABEL, type AppRole, type Area } from '../lib/types';
+import { ROLE_LABEL, cabinName, type AppRole, type Area } from '../lib/types';
 import { Icon } from '../components/Icon';
 import { PushSetup } from '../components/PushSetup';
 import { ArchiveTab } from '../components/ArchiveTab';
@@ -16,6 +16,7 @@ interface AdminCabin {
   id: string; area: Area; number: number; label: string; address: string | null;
   gnr: number | null; bnr: number | null; fnr: number | null;
   vel_member: boolean; va_member: boolean; vei_member: boolean; access: 'full' | 'veilag'; tomt: Tomt | null;
+  project_name: string | null;
 }
 type Tomt = 'feste' | 'selveier';
 const TOMT_LABEL: Record<Tomt, string> = { feste: 'Festetomt', selveier: 'Selveiertomt' };
@@ -62,7 +63,7 @@ export function AdminPage() {
 
   const load = useCallback(async () => {
     const [c, p, n] = await Promise.all([
-      supabase.from('cabins').select('id,area,number,label,address,gnr,bnr,fnr,vel_member,va_member,vei_member,access,tomt').order('area').order('number'),
+      supabase.from('cabins').select('*').order('area').order('number'),
       supabase.rpc('admin_people'),
       supabase.from('cabin_notes').select('cabin_id,note'),
     ]);
@@ -113,7 +114,7 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase();
     return cabins.filter((c) => (area === 'alle' || c.area === area) && (tomt === 'alle' || c.tomt === tomt) && (!s
-      || c.label.toLowerCase().includes(s) || String(c.number) === s || (c.address ?? '').toLowerCase().includes(s)
+      || c.label.toLowerCase().includes(s) || (c.project_name ?? '').toLowerCase().includes(s) || String(c.number) === s || (c.address ?? '').toLowerCase().includes(s)
       || ownersOf(c.id).some((o) => o.full_name.toLowerCase().includes(s) || (o.email ?? '').includes(s))));
   }, [cabins, area, tomt, q, ownersOf]);
 
@@ -183,7 +184,7 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
               <tbody>
                 {shown.map((c) => (
                   <tr key={c.id}>
-                    <td><b>{c.label}</b>{notes[c.id] && <div className="muted" style={{ fontSize: 12 }} title={notes[c.id]}>Merknad</div>}</td>
+                    <td><b>{c.label}</b>{c.project_name && <div className="projpill">{c.project_name}</div>}{notes[c.id] && <div className="muted" style={{ fontSize: 12 }} title={notes[c.id]}>Merknad</div>}</td>
                     <td>{AREA_LABEL[c.area]}{c.access === 'veilag' && <div className="muted" style={{ fontSize: 12 }}>Bare Veilaget</div>}</td>
                     <td>{c.address || <span className="muted">–</span>}</td>
                     <td>{c.tomt ? TOMT_LABEL[c.tomt] : <span className="muted">–</span>}</td>
@@ -258,6 +259,7 @@ function CabinForm({ cabins, editing, owners, workers, reload, note: initialNote
   const [va, setVa] = useState(editing ? editing.va_member : startArea === 'morvika');
   const [tomt, setTomt] = useState<Tomt | null>(editing ? editing.tomt : defaultTomt(startArea));
   const [note, setNote] = useState(initialNote);
+  const [projectName, setProjectName] = useState(editing?.project_name ?? '');
   const [ownerRows, setOwnerRows] = useState<OwnerDraft[]>(() => editing && owners.length
     ? owners.map((o) => ({ key: o.id, id: o.id, name: o.full_name, email: o.email ?? '', phone: o.phone ?? '', status: o.status }))
     : [{ key: newKey(), name: '', email: '', phone: '' }]);
@@ -306,12 +308,14 @@ function CabinForm({ cabins, editing, owners, workers, reload, note: initialNote
       vel_member: area === 'torpum' ? false : vel, va_member: area === 'torpum' ? false : va, vei_member: true,
       access: area === 'torpum' ? 'veilag' : 'full',
     };
+    // Prosjektnavn sendes bare når det er i bruk (virker også før databasen er oppdatert)
+    const withProject = projectName.trim() || editing?.project_name ? { ...row, project_name: area === 'torpum' ? null : projectName.trim() || null } : row;
     let cabinId = editing?.id;
     if (editing) {
-      const { error: e1 } = await supabase.from('cabins').update(row).eq('id', editing.id);
+      const { error: e1 } = await supabase.from('cabins').update(withProject).eq('id', editing.id);
       if (e1) { setBusy(false); setError(e1.code === '23505' ? `${row.label} finnes allerede.` : 'Hytta ble ikke lagret. Prøv igjen.'); return; }
     } else {
-      const { data, error: e1 } = await supabase.from('cabins').insert(row).select('id').single();
+      const { data, error: e1 } = await supabase.from('cabins').insert(withProject).select('id').single();
       if (e1 || !data) { setBusy(false); setError(e1?.code === '23505' ? `${row.label} finnes allerede i ${AREA_LABEL[area]}.` : 'Hytta ble ikke lagret. Prøv igjen.'); return; }
       cabinId = data.id as string;
     }
@@ -357,7 +361,7 @@ function CabinForm({ cabins, editing, owners, workers, reload, note: initialNote
     if (editing) { onClose(); return; }
     if (andNext) {
       setNumber(String(nextNumber(area, n + 1)));
-      setLabel(''); setLabelTouched(false); setAddress(streetOf(address)); setBnr(''); setFnr(''); setNote('');
+      setLabel(''); setLabelTouched(false); setAddress(streetOf(address)); setBnr(''); setFnr(''); setNote(''); setProjectName('');
       setOwnerRows([{ key: newKey(), name: '', email: '', phone: '' }]); setRemoved([]);
       numberRef.current?.focus();
     } else onClose();
@@ -391,6 +395,12 @@ function CabinForm({ cabins, editing, owners, workers, reload, note: initialNote
             onFocus={(e) => { const el = e.currentTarget; const end = el.value.length; requestAnimationFrame(() => el.setSelectionRange(end, end)); }} />
           <small className="hint">Veinavnet blir stående til neste hytte. Skriv bare nummeret, eller bytt veinavn når du kommer til en ny vei.</small>
         </label>
+        {area === 'morvika' && (
+          <label className="field span2" htmlFor="q-project">Prosjektnavn (bare for hytter under bygging)
+            <input id="q-project" type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="F.eks. Prosjekt 3 – Tomt C" maxLength={60} />
+            <small className="hint">Vises for deg og prosjektmedarbeiderne, så de ser hvilken hytte de jobber på. Fjernes automatisk ved eierskifte.</small>
+          </label>
+        )}
         <label className="field" htmlFor="q-gnr">Gnr<input id="q-gnr" type="number" min={1} inputMode="numeric" value={gnr} onChange={(e) => setGnr(e.target.value)} /></label>
         <label className="field" htmlFor="q-bnr">Bnr<input id="q-bnr" type="number" min={1} inputMode="numeric" value={bnr} onChange={(e) => setBnr(e.target.value)} /></label>
         <label className="field" htmlFor="q-fnr">Fnr<input id="q-fnr" type="number" min={1} inputMode="numeric" disabled={tomt === 'selveier'}
@@ -555,7 +565,7 @@ function WorkersTab({ cabins, people, reload }: { cabins: AdminCabin[]; people: 
   const workers = people.filter((p) => (p.worker_cabin_ids ?? []).length > 0).sort((a, b) => a.full_name.localeCompare(b.full_name, 'nb'));
   // Hyttene til prosjekt-e-posten, og hytter som allerede har medarbeidere
   const projectIds = new Set([...owners.flatMap((o) => o.cabin_ids), ...workers.flatMap((w) => w.worker_cabin_ids ?? [])]);
-  const projects = cabins.filter((c) => projectIds.has(c.id) && c.access === 'full').sort((a, b) => a.label.localeCompare(b.label, 'nb', { numeric: true }));
+  const projects = cabins.filter((c) => projectIds.has(c.id) && c.access === 'full').sort((a, b) => cabinName(a).localeCompare(cabinName(b), 'nb', { numeric: true }));
   const shown = workers.filter((w) => !q.trim() || `${w.full_name} ${w.email ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()));
 
   async function toggle(w: Person, c: AdminCabin) {
@@ -567,7 +577,7 @@ function WorkersTab({ cabins, people, reload }: { cabins: AdminCabin[]; people: 
       : await supabase.rpc('admin_add_worker', { p_cabin: c.id, p_name: w.full_name, p_email: w.email, p_phone: w.phone });
     setBusy(null);
     if (error) { toast(error.message.includes('function') ? 'Databasen må oppdateres først (prosjektmedarbeider).' : 'Endringen ble ikke lagret. Prøv igjen.'); return; }
-    toast(`${w.full_name}: ${c.label} ${on ? 'fjernet' : 'lagt til'}.`);
+    toast(`${w.full_name}: ${cabinName(c)} ${on ? 'fjernet' : 'lagt til'}.`);
     await reload();
   }
   async function removeAll(w: Person) {
@@ -624,7 +634,7 @@ function WorkersTab({ cabins, people, reload }: { cabins: AdminCabin[]; people: 
                 const on = (w.worker_cabin_ids ?? []).includes(c.id);
                 return (
                   <button key={c.id} className={`rolebtn big ${on ? 'on' : ''}`} aria-pressed={on} disabled={busy !== null} onClick={() => void toggle(w, c)}>
-                    {on ? '✓ ' : ''}{c.label}
+                    {on ? '✓ ' : ''}{cabinName(c)}
                   </button>
                 );
               })}
@@ -676,7 +686,7 @@ function NewWorkerForm({ projects, onDone, onCancel }: { projects: AdminCabin[];
         <div className="checks">
           {projects.map((c) => (
             <label key={c.id} className="check"><input type="checkbox" checked={picked.includes(c.id)}
-              onChange={(e) => setPicked((x) => (e.target.checked ? [...x, c.id] : x.filter((y) => y !== c.id)))} /> {c.label}</label>
+              onChange={(e) => setPicked((x) => (e.target.checked ? [...x, c.id] : x.filter((y) => y !== c.id)))} /> {cabinName(c)}</label>
           ))}
         </div>
       </div>

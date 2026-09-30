@@ -11,7 +11,7 @@ export interface FormerCabin {
 
 /** Byggeprosjekt der man er prosjektmedarbeider (håndverker): bare dokumenter og bilder */
 export interface WorkerCabin {
-  cabin_id: string; label: string; number: number; gnr: number | null; bnr: number | null; ownership_id: string; fdv: boolean;
+  cabin_id: string; label: string; number: number; gnr: number | null; bnr: number | null; ownership_id: string; fdv: boolean; project_name: string | null;
 }
 
 interface Me {
@@ -57,7 +57,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const [p, r, c, f, k] = await Promise.all([
       supabase.rpc('my_profile').maybeSingle<Profile>(),
       supabase.from('user_roles').select('role').eq('user_id', uid),
-      supabase.from('cabin_owners').select('cabin:cabins(id,area,number,label,gnr,bnr,vel_member,va_member,vei_member,access)').eq('user_id', uid),
+      supabase.from('cabin_owners').select('cabin:cabins(*)').eq('user_id', uid),
       supabase.rpc('my_former_cabins'),
       supabase.rpc('my_worker_cabins'),
     ]);

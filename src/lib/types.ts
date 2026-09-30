@@ -16,7 +16,13 @@ export interface Cabin {
   vei_member: boolean;
   /** full = vanlig hytteeier, veilag = ser bare det som kommer fra Mørvikveien Veilag (Torpum) */
   access: CabinAccess;
+  /** Prosjektnavn mens hytta bygges (f.eks. «Prosjekt 3 – Tomt C»). Fjernes ved eierskifte. */
+  project_name?: string | null;
 }
+
+/** Navnet på hytta slik det vises: prosjektnavnet først når hytta er et byggeprosjekt */
+export const cabinName = (c: { label: string; project_name?: string | null }) =>
+  c.project_name ? `${c.project_name} · ${c.label}` : c.label;
 
 export interface Profile {
   id: string;
