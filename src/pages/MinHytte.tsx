@@ -17,9 +17,9 @@ const FDV_FOLDERS = ['Tegninger', 'Produktdata', 'Garantier', 'Veiledninger', 'F
 const CATS = ['Festeavgift', 'Vei og brøyting', 'Strøm', 'Forsikring', 'Kommunale avgifter', 'Vedlikehold', 'Innkjøp', 'Utleie', 'Annet'];
 const ARCHIVE = 'Fra grunneier';
 
-interface Doc { id: string; folder: string; name: string; storage_path: string; size_bytes: number | null; created_at: string }
+interface Doc { id: string; folder: string; name: string; storage_path: string; size_bytes: number | null; created_at: string; uploaded_by: string | null }
 interface Album { id: string; name: string; created_at: string }
-interface Photo { id: string; album_id: string | null; caption: string; storage_path: string; created_at: string }
+interface Photo { id: string; album_id: string | null; caption: string; storage_path: string; created_at: string; uploaded_by: string | null }
 interface Entry { id: string; entry_date: string; description: string; category: string; amount: number; kind: 'ut' | 'inn'; receipt_path: string | null }
 interface Arch { id: string; title: string; category: string; document_date: string | null; storage_path: string; created_at: string }
 
@@ -28,6 +28,13 @@ const size = (b: number | null) => (b == null ? '' : b > 1_000_000 ? `${(b / 1_0
 const ext = (n: string) => (n.split('.').pop() || '').toUpperCase().slice(0, 4);
 const safeName = (n: string) => n.normalize('NFKD').replace(/[^\w.-]+/g, '_').replace(/_+/g, '_').slice(-80);
 const today = () => new Date().toISOString().slice(0, 10);
+/** Hvem som har lastet opp (id → navn) */
+type Names = Record<string, string>;
+/** Tilgang i Min hytte: eier, eller prosjektmedarbeider (bare dokumenter og bilder, endrer bare egne) */
+interface Access { worker: boolean; uid: string; names: Names }
+const mayEdit = (a: Access, by: string | null) => !a.worker || by === a.uid;
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+const byLine = (a: Access, by: string | null) => (by && a.names[by] ? (by === a.uid ? 'deg' : a.names[by]) : '');
 
 async function openFile(bucket: string, path: string, toast: (m: string) => void) {
   const w = window.open('', '_blank');
@@ -40,9 +47,18 @@ export function MinHyttePage() {
   const me = useMe();
   const toast = useToast();
   const cabins = me.fullCabins;
-  const [cabinId, setCabinId] = useState(cabins[0]?.id ?? (me.former[0] ? `old:${me.former[0].ownership_id}` : ''));
+  const jobs = me.workerCabins;
+  const [cabinId, setCabinId] = useState(cabins[0]?.id ?? (me.former[0] ? `old:${me.former[0].ownership_id}` : jobs[0] ? `job:${jobs[0].cabin_id}` : ''));
   const formerSel = cabinId.startsWith('old:') ? me.former.find((f) => `old:${f.ownership_id}` === cabinId) ?? null : null;
-  const cabin = formerSel ? undefined : cabins.find((c) => c.id === cabinId) ?? cabins[0];
+  const jobSel = cabinId.startsWith('job:') ? jobs.find((j) => `job:${j.cabin_id}` === cabinId) ?? null : null;
+  const jobCabin = useMemo<Cabin | undefined>(() => jobSel ? {
+    id: jobSel.cabin_id, area: 'morvika', number: jobSel.number, label: jobSel.label, gnr: jobSel.gnr, bnr: jobSel.bnr,
+    vel_member: false, va_member: false, vei_member: false, access: 'full',
+  } : undefined, [jobSel]);
+  const worker = Boolean(jobSel);
+  const cabin = formerSel ? undefined : jobCabin ?? cabins.find((c) => c.id === cabinId) ?? cabins[0];
+  const [names, setNames] = useState<Names>({});
+  const access: Access = { worker, uid: me.session?.user.id ?? '', names };
   const [tab, setTab] = useState<Tab>('home');
   const [own, setOwn] = useState<string | null>(null);
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -55,29 +71,33 @@ export function MinHyttePage() {
 
   const load = useCallback(async () => {
     if (!cabin) return;
-    const { data: w } = await supabase.rpc('my_ownership', { c: cabin.id });
-    const o = (w as string | null) ?? null;
+    // Prosjektmedarbeider: eierperioden kommer fra prosjektlisten
+    const o = jobSel ? jobSel.ownership_id : ((await supabase.rpc('my_ownership', { c: cabin.id })).data as string | null) ?? null;
     setOwn(o);
     if (!o) { setLoaded(true); return; }
-    const [d, a, p, l, ar, w2] = await Promise.all([
-      supabase.from('cabin_documents').select('id,folder,name,storage_path,size_bytes,created_at').eq('ownership_id', o).order('created_at', { ascending: false }),
+    const none = Promise.resolve({ data: null });
+    const [d, a, p, l, ar, w2, n] = await Promise.all([
+      supabase.from('cabin_documents').select('id,folder,name,storage_path,size_bytes,created_at,uploaded_by').eq('ownership_id', o).order('created_at', { ascending: false }),
       supabase.from('cabin_albums').select('id,name,created_at').eq('ownership_id', o).order('created_at'),
-      supabase.from('cabin_photos').select('id,album_id,caption,storage_path,created_at').eq('ownership_id', o).order('created_at', { ascending: false }),
-      supabase.from('cabin_ledger').select('id,entry_date,description,category,amount,kind,receipt_path').eq('ownership_id', o).order('entry_date', { ascending: false }),
-      supabase.from('cabin_archive').select('id,title,category,document_date,storage_path,created_at').eq('cabin_id', cabin.id).order('created_at', { ascending: false }),
-      supabase.from('ownerships').select('fdv').eq('id', o).maybeSingle(),
+      supabase.from('cabin_photos').select('id,album_id,caption,storage_path,created_at,uploaded_by').eq('ownership_id', o).order('created_at', { ascending: false }),
+      jobSel ? none : supabase.from('cabin_ledger').select('id,entry_date,description,category,amount,kind,receipt_path').eq('ownership_id', o).order('entry_date', { ascending: false }),
+      jobSel ? none : supabase.from('cabin_archive').select('id,title,category,document_date,storage_path,created_at').eq('cabin_id', cabin.id).order('created_at', { ascending: false }),
+      jobSel ? none : supabase.from('ownerships').select('fdv').eq('id', o).maybeSingle(),
+      supabase.rpc('ownership_uploaders', { w: o }),
     ]);
-    setFdv(Boolean((w2.data as { fdv?: boolean } | null)?.fdv));
+    setFdv(jobSel ? jobSel.fdv : Boolean((w2.data as { fdv?: boolean } | null)?.fdv));
     setDocs((d.data ?? []) as Doc[]); setAlbums((a.data ?? []) as Album[]); setPhotos((p.data ?? []) as Photo[]);
     setLedger(((l.data ?? []) as Entry[]).map((x) => ({ ...x, amount: Number(x.amount) })));
     setArchive((ar.data ?? []) as Arch[]);
+    setNames(Object.fromEntries(((n.data ?? []) as { id: string; full_name: string }[]).map((x) => [x.id, x.full_name])));
     setLoaded(true);
-  }, [cabin]);
+  }, [cabin, jobSel]);
   useEffect(() => { setLoaded(false); void load(); }, [load]);
 
-  const picker = cabins.length + me.former.length > 1 && (tab === 'home' || formerSel) && (
+  const picker = cabins.length + me.former.length + jobs.length > 1 && (tab === 'home' || formerSel) && (
     <div className="chips" role="group" aria-label="Velg hytte">
-      {cabins.map((c) => <button key={c.id} className={`chip ${c.id === cabin?.id ? 'on' : ''}`} onClick={() => { setCabinId(c.id); setTab('home'); }}>{c.label}</button>)}
+      {cabins.map((c) => <button key={c.id} className={`chip ${!jobSel && c.id === cabin?.id ? 'on' : ''}`} onClick={() => { setCabinId(c.id); setTab('home'); }}>{c.label}</button>)}
+      {jobs.map((j) => <button key={j.cabin_id} className={`chip ${jobSel?.cabin_id === j.cabin_id ? 'on' : ''}`} onClick={() => { setCabinId(`job:${j.cabin_id}`); setTab('home'); }}>Prosjekt: {j.label}</button>)}
       {me.former.map((f) => <button key={f.ownership_id} className={`chip ${formerSel?.ownership_id === f.ownership_id ? 'on' : ''}`} onClick={() => setCabinId(`old:${f.ownership_id}`)}>Tidligere: {f.label}</button>)}
     </div>
   );
@@ -86,14 +106,14 @@ export function MinHyttePage() {
   if (loaded && !own) return <div className="empty">Min hytte kunne ikke åpnes. Ta kontakt med administrator.</div>;
 
   const titles: Record<Tab, string> = { home: cabin.label, dok: 'Dokumentregister', foto: 'Fotoalbum', regn: 'Hytteregnskap' };
-  const others = (['dok', 'foto', 'regn'] as Tab[]).filter((t) => t !== tab);
+  const others = ((worker ? ['dok', 'foto'] : ['dok', 'foto', 'regn']) as Tab[]).filter((t) => t !== tab);
 
   return (
     <>
       {picker}
       {tab === 'home' ? (
         <HytteHome cabin={cabin} name={me.profile?.full_name ?? ''} docs={docs} archive={archive} photos={photos} albums={albums} ledger={ledger} go={setTab}
-          own={own} fdv={fdv} reload={load} toast={toast} />
+          own={own} fdv={fdv} reload={load} toast={toast} worker={worker} />
       ) : (
         <div className="subhead">
           <button className="crumb" onClick={() => setTab('home')}><Icon name="back" size={18} />{cabin.label}</button>
@@ -102,17 +122,17 @@ export function MinHyttePage() {
         </div>
       )}
       {!loaded && tab !== 'home' && <div className="empty">Henter …</div>}
-      {loaded && own && tab === 'dok' && <Documents cabinId={cabin.id} own={own} docs={docs} archive={archive} reload={load} toast={toast} fdv={fdv} />}
-      {loaded && own && tab === 'foto' && <Photos cabinId={cabin.id} own={own} albums={albums} photos={photos} reload={load} toast={toast} />}
-      {loaded && own && tab === 'regn' && <Ledger cabinId={cabin.id} own={own} ledger={ledger} reload={load} toast={toast} label={cabin.label} />}
+      {loaded && own && tab === 'dok' && <Documents cabinId={cabin.id} own={own} docs={docs} archive={archive} reload={load} toast={toast} fdv={fdv} access={access} />}
+      {loaded && own && tab === 'foto' && <Photos cabinId={cabin.id} own={own} albums={albums} photos={photos} reload={load} toast={toast} access={access} />}
+      {loaded && own && !worker && tab === 'regn' && <Ledger cabinId={cabin.id} own={own} ledger={ledger} reload={load} toast={toast} label={cabin.label} />}
     </>
   );
 }
 
 /* ---------- Forsiden for hytta ---------- */
-function HytteHome({ cabin, name, docs, archive, photos, albums, ledger, go, own, fdv, reload, toast }: {
+function HytteHome({ cabin, name, docs, archive, photos, albums, ledger, go, own, fdv, reload, toast, worker }: {
   cabin: Cabin; name: string; docs: Doc[]; archive: Arch[]; photos: Photo[]; albums: Album[]; ledger: Entry[]; go: (t: Tab) => void;
-  own: string | null; fdv: boolean; reload: () => Promise<void>; toast: (m: string) => void;
+  own: string | null; fdv: boolean; reload: () => Promise<void>; toast: (m: string) => void; worker: boolean;
 }) {
   const yr = new Date().getFullYear();
   const thisYr = ledger.filter((x) => x.entry_date.startsWith(String(yr)));
@@ -126,10 +146,12 @@ function HytteHome({ cabin, name, docs, archive, photos, albums, ledger, go, own
         <svg className="waves" width="260" height="120" viewBox="0 0 34 16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden="true">
           <path d="M1 6c3-2 5-2 7.5 0s5 2 7.5 0 5-2 7.5 0 5 2 7.5 0" /><path d="M1 11c3-2 5-2 7.5 0s5 2 7.5 0 5-2 7.5 0 5 2 7.5 0" />
         </svg>
-        <div className="eyebrow">Mørvika hytteområde</div>
+        <div className="eyebrow">{worker ? 'Byggeprosjekt' : 'Mørvika hytteområde'}</div>
         <h2>{cabin.label}</h2>
-        <div className="sub">{cabin.gnr ? `Gnr ${cabin.gnr} / bnr ${cabin.bnr ?? '–'} · ` : ''}{name}</div>
-        <div className="lockchip"><Icon name="lock" size={15} />Privat. Bare hyttas eiere har tilgang.</div>
+        <div className="sub">{cabin.gnr ? `Gnr ${cabin.gnr} / bnr ${cabin.bnr ?? '–'} · ` : ''}{worker ? `Prosjektmedarbeider: ${name}` : name}</div>
+        <div className="lockchip"><Icon name="lock" size={15} />{worker
+          ? 'Du ser dokumenter og bilder for prosjektet, og kan endre det du selv laster opp.'
+          : 'Privat. Bare hyttas eiere har tilgang.'}</div>
       </section>
       <div className="apps">
         <button className="card apptile" onClick={() => go('dok')}>
@@ -137,7 +159,7 @@ function HytteHome({ cabin, name, docs, archive, photos, albums, ledger, go, own
           <div><h3>Dokumentregister</h3><div className="meta">{docs.length + archive.length} dokumenter i {folders} {folders === 1 ? 'mappe' : 'mapper'}</div></div>
           <div className="pv">{docs.length || archive.length
             ? [...archive.map((a) => a.title), ...docs.map((d) => d.name)].slice(0, 3).map((n, i) => <span key={i} className="ln">{n}</span>)
-            : <span className="muted">Last opp festekontrakt, forsikring og tegninger.</span>}</div>
+            : <span className="muted">{worker ? 'Last opp tegninger, produktdata og samsvarserklæringer.' : 'Last opp festekontrakt, forsikring og tegninger.'}</span>}</div>
           <span className="go">Åpne <Icon name="chev" size={16} /></span>
         </button>
         <button className="card apptile" onClick={() => go('foto')}>
@@ -145,18 +167,18 @@ function HytteHome({ cabin, name, docs, archive, photos, albums, ledger, go, own
           <div><h3>Fotoalbum</h3><div className="meta">{photos.length} bilder i {albums.length} album</div></div>
           <div className="pv">{recent.length
             ? <div className="thumbs">{recent.map((p) => <span key={p} style={urls[p] ? { backgroundImage: `url("${urls[p]}")` } : undefined} />)}</div>
-            : <span className="muted">Samle hyttebildene på ett sted.</span>}</div>
+            : <span className="muted">{worker ? 'Ta bilder av arbeidet, gjerne før det lukkes.' : 'Samle hyttebildene på ett sted.'}</span>}</div>
           <span className="go">Åpne <Icon name="chev" size={16} /></span>
         </button>
-        <button className="card apptile" onClick={() => go('regn')}>
+        {!worker && <button className="card apptile" onClick={() => go('regn')}>
           <span className="ic"><Icon name="book" size={24} /></span>
           <div><h3>Hytteregnskap</h3><div className="meta">{thisYr.length} poster ført i {yr}</div></div>
           <div className="pv"><span className="muted">Netto kostnad {yr}</span><span className="big">{kr(net)}</span>
             {ledger[0] && <span className="ln muted">Sist: {ledger[0].description}</span>}</div>
           <span className="go">Åpne <Icon name="chev" size={16} /></span>
-        </button>
+        </button>}
       </div>
-      <FdvBar cabin={cabin} own={own} fdv={fdv} docs={docs} archive={archive} photos={photos} albums={albums} reload={reload} toast={toast} />
+      {!worker && <FdvBar cabin={cabin} own={own} fdv={fdv} docs={docs} archive={archive} photos={photos} albums={albums} reload={reload} toast={toast} />}
     </>
   );
 }
@@ -231,8 +253,8 @@ function FdvBar({ cabin, own, fdv, docs, archive, photos, albums, reload, toast 
 }
 
 /* ---------- Dokumentregister ---------- */
-function Documents({ cabinId, own, docs, archive, reload, toast, fdv }: {
-  cabinId: string; own: string; docs: Doc[]; archive: Arch[]; reload: () => Promise<void>; toast: (m: string) => void; fdv: boolean;
+function Documents({ cabinId, own, docs, archive, reload, toast, fdv, access }: {
+  cabinId: string; own: string; docs: Doc[]; archive: Arch[]; reload: () => Promise<void>; toast: (m: string) => void; fdv: boolean; access: Access;
 }) {
   const BASE = fdv ? FDV_FOLDERS : FOLDERS;
   const custom = [...new Set(docs.map((d) => d.folder))].filter((f) => !BASE.includes(f));
@@ -334,16 +356,16 @@ function Documents({ cabinId, own, docs, archive, reload, toast, fdv }: {
               <div key={d.id} className="docrow">
                 <span className={`ftag t-${ext(d.name).toLowerCase()}`}>{ext(d.name) || 'FIL'}</span>
                 <button className="dm docbtn2" onClick={() => void openFile('hytte', d.storage_path, toast)}>
-                  <div className="n">{d.name}</div><div className="d">{d.folder}{d.size_bytes ? ` · ${size(d.size_bytes)}` : ''} · {dShort(d.created_at)}</div>
+                  <div className="n">{d.name}</div><div className="d">{d.folder}{d.size_bytes ? ` · ${size(d.size_bytes)}` : ''} · {dShort(d.created_at)}{byLine(access, d.uploaded_by) && ` · av ${byLine(access, d.uploaded_by)}`}</div>
                 </button>
-                <span className="docacts">
+                {mayEdit(access, d.uploaded_by) && <span className="docacts">
                   <select aria-label={`Flytt ${d.name}`} value="" onChange={(e) => e.target.value && void move(d, e.target.value)}>
                     <option value="">Flytt …</option>{folders.filter((f) => f !== d.folder).map((f) => <option key={f} value={f}>{f}</option>)}
                   </select>
                   {confirmDel === d.id
                     ? <><button className="btn small danger-btn" onClick={() => void remove(d)}>Slett</button><button className="btn small ghost" onClick={() => setConfirmDel(null)}>Avbryt</button></>
                     : <button className="linkbtn" onClick={() => setConfirmDel(d.id)}>Slett</button>}
-                </span>
+                </span>}
               </div>
             ))}
             {shown.length === 0 && <div className="empty" style={{ border: 0, margin: 8 }}>Ingen dokumenter i denne mappen ennå.</div>}
@@ -355,8 +377,8 @@ function Documents({ cabinId, own, docs, archive, reload, toast, fdv }: {
 }
 
 /* ---------- Fotoalbum ---------- */
-function Photos({ cabinId, own, albums, photos, reload, toast }: {
-  cabinId: string; own: string; albums: Album[]; photos: Photo[]; reload: () => Promise<void>; toast: (m: string) => void;
+function Photos({ cabinId, own, albums, photos, reload, toast, access }: {
+  cabinId: string; own: string; albums: Album[]; photos: Photo[]; reload: () => Promise<void>; toast: (m: string) => void; access: Access;
 }) {
   const [album, setAlbum] = useState<string>('alle');
   const [target, setTarget] = useState<string>(albums[0]?.id ?? '');
@@ -428,7 +450,7 @@ function Photos({ cabinId, own, albums, photos, reload, toast }: {
             <span className="nm"><b>{name}</b><small>{inAlbum(id).length} {inAlbum(id).length === 1 ? 'bilde' : 'bilder'}</small></span>
           </button>
         ))}
-        {newName === null ? (
+        {access.worker ? null : newName === null ? (
           <button className="album new" onClick={() => setNewName('')}><span className="cv"><Icon name="plus" size={28} /></span>
             <span className="nm"><b>Nytt album</b><small>Samle bilder fra en tur eller et prosjekt</small></span></button>
         ) : (
@@ -458,7 +480,7 @@ function Photos({ cabinId, own, albums, photos, reload, toast }: {
       <div className="galhead">
         <h3 className="serif">{album === 'alle' ? 'Alle bilder' : album === 'ingen' ? 'Uten album' : albums.find((a) => a.id === album)?.name}</h3>
         <span className="muted">{shown.length} {shown.length === 1 ? 'bilde' : 'bilder'}{shown.length ? ' · trykk for å se stort' : ''}</span>
-        {album !== 'alle' && album !== 'ingen' && (confirmDel === album
+        {!access.worker && album !== 'alle' && album !== 'ingen' && (confirmDel === album
           ? <span className="confirm">Slette albumet? Bildene blir liggende.<button className="btn small danger-btn" onClick={() => void removeAlbum(albums.find((a) => a.id === album)!)}>Slett album</button><button className="btn small ghost" onClick={() => setConfirmDel(null)}>Avbryt</button></span>
           : <button className="linkbtn" onClick={() => setConfirmDel(album)}>Slett album</button>)}
       </div>
@@ -467,9 +489,9 @@ function Photos({ cabinId, own, albums, photos, reload, toast }: {
           {shown.map((p, i) => (
             <div key={p.id} className="ptwrap">
               <button className="pt" style={urls[p.storage_path] ? { backgroundImage: `url("${urls[p.storage_path]}")` } : undefined} onClick={() => setOpen(i)} aria-label={`Vis ${p.caption || 'bilde'}`}>
-                {p.caption && <span>{p.caption}</span>}
+                {(p.caption || byLine(access, p.uploaded_by)) && <span>{p.caption}{byLine(access, p.uploaded_by) && <small className="pby">{cap(byLine(access, p.uploaded_by))} · {dShort(p.created_at)}</small>}</span>}
               </button>
-              <button className="ptedit" onClick={() => setSelected(p)} aria-label="Endre bildetekst eller album"><Icon name="more" size={18} /></button>
+              <button className="ptedit" onClick={() => setSelected(p)} aria-label={mayEdit(access, p.uploaded_by) ? 'Endre bildetekst eller album' : 'Om bildet'}><Icon name="more" size={18} /></button>
             </div>
           ))}
         </div>
@@ -477,20 +499,35 @@ function Photos({ cabinId, own, albums, photos, reload, toast }: {
 
       {open !== null && <Lightbox urls={shown.map((p) => urls[p.storage_path]).filter(Boolean)} start={open} onClose={() => setOpen(null)} />}
       {selected && <PhotoEdit p={selected} albums={albums} url={urls[selected.storage_path]} onSave={saveCaption} onClose={() => setSelected(null)}
+        by={byLine(access, selected.uploaded_by)} readOnly={!mayEdit(access, selected.uploaded_by)}
         onDelete={() => (confirmDel === selected.id ? void removePhoto(selected) : setConfirmDel(selected.id))} confirming={confirmDel === selected.id} />}
     </>
   );
 }
 
-function PhotoEdit({ p, albums, url, onSave, onClose, onDelete, confirming }: {
+function PhotoEdit({ p, albums, url, onSave, onClose, onDelete, confirming, by, readOnly }: {
   p: Photo; albums: Album[]; url?: string; onSave: (p: Photo, caption: string, album: string | null) => void; onClose: () => void; onDelete: () => void; confirming: boolean;
+  by: string; readOnly: boolean;
 }) {
   const [caption, setCaption] = useState(p.caption);
   const [album, setAlbum] = useState(p.album_id ?? '');
+  const when = new Date(p.created_at).toLocaleString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  if (readOnly) return (
+    <div className="sheet-bg" onClick={onClose}>
+      <div className="sheet card" onClick={(e) => e.stopPropagation()}>
+        {url && <img src={url} alt="" className="sheet-img" />}
+        {p.caption && <p style={{ margin: 0 }}><b>{p.caption}</b></p>}
+        <p className="muted" style={{ margin: 0 }}>Lastet opp {by ? `av ${by} ` : ''}{when}{p.album_id ? ` · ${albums.find((a) => a.id === p.album_id)?.name ?? ''}` : ''}</p>
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>Bare den som lastet opp bildet, og hyttas eier, kan endre eller slette det.</p>
+        <div className="actions"><span style={{ flex: 1 }} /><button type="button" className="btn" onClick={onClose}>Lukk</button></div>
+      </div>
+    </div>
+  );
   return (
     <div className="sheet-bg" onClick={onClose}>
       <form className="sheet card" onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); onSave(p, caption, album || null); }}>
         {url && <img src={url} alt="" className="sheet-img" />}
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>Lastet opp {by ? `av ${by} ` : ''}{when}</p>
         <label className="field" htmlFor="ph-cap">Bildetekst
           <input id="ph-cap" type="text" value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="F.eks. Nytt tak, august 2026" maxLength={200} />
         </label>

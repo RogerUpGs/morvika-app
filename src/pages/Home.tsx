@@ -39,7 +39,7 @@ export function Home({ go }: { go: (r: string) => void }) {
   }, [me.session?.user.id]);
 
   const sub: Record<string, string> = {
-    minhytte: me.cabins[0]?.label ?? '',
+    minhytte: me.cabins[0]?.label ?? (me.workerCabins.length ? `Prosjekt: ${me.workerCabins.map((w) => w.label).join(', ')}` : ''),
     chat: badges.newPosts ? `${badges.newPosts} ${badges.newPosts === 1 ? 'nytt innlegg' : 'nye innlegg'}` : 'Del bilder og nytt',
     nyheter: unreadNews ? `${unreadNews} ${unreadNews === 1 ? 'ny' : 'nye'}` : lastNews ? `Siste ${dShort(lastNews)}` : me.veilagOnly ? 'Fra Veilaget' : 'Fra styret og grunneier',
     varsler: badges.openAlerts.length ? `${badges.openAlerts.length} venter på deg` : 'Ingen nye',
@@ -58,7 +58,7 @@ export function Home({ go }: { go: (r: string) => void }) {
     <>
       <div className="hello">
         <h2>{greeting()}, {firstName(me.profile?.full_name ?? '')}</h2>
-        <p>{me.cabins.length ? `${me.cabins.map((c) => c.label).join(', ')} · ` : ''}{place}</p>
+        <p>{me.cabins.length ? `${me.cabins.map((c) => c.label).join(', ')} · ` : ''}{!me.isResident && me.workerCabins.length ? 'Prosjektmedarbeider · ' : ''}{place}</p>
       </div>
       {sendersFor(me.roles).some((s) => s !== 'admin') && (
         <button className="fieldbtn" onClick={() => go('del')}>
@@ -67,7 +67,7 @@ export function Home({ go }: { go: (r: string) => void }) {
         </button>
       )}
       <InstallPrompt />
-      <PushPrompt />
+      {me.isResident && <PushPrompt />}
       <div className="tiles">
         {tiles.map((it) => (
           <button key={it.key} className={`tile2 t-${it.key} ${it.key === 'varsler' && akutt ? 'akutt' : ''}`} onClick={() => go(it.key)}>

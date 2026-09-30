@@ -41,7 +41,8 @@ export function Shell() {
   useEffect(() => { document.title = `${TITLES[view] ?? 'Mørvika'} · Mørvika`; }, [view]);
 
   const groups = ['Min hytte', 'Fellesskap', 'Administrasjon'] as const;
-  const eyebrow = me.veilagOnly ? 'Mørvikveien Veilag'
+  const eyebrow = !me.isResident && me.workerCabins.length ? 'Byggeprosjekt'
+    : me.veilagOnly ? 'Mørvikveien Veilag'
     : view === 'hjem' ? 'Mørvika hytteområde' : view === 'del' ? 'Nyheter' : items.find((i) => i.key === view)?.group ?? 'Fellesskap';
 
   const tasksDue = useTaskCount();
@@ -89,9 +90,10 @@ export function Shell() {
         </nav>
         <div className="who">
           <b>{me.profile?.full_name || me.session?.user.email}</b>
-          {me.cabins.map((c) => c.label).join(', ')}
+          {[...me.cabins.map((c) => c.label), ...me.workerCabins.map((w) => w.label)].join(', ')}
           <div className="rolechips" style={{ marginTop: 6 }}>
             {me.cabins.length > 0 && <span className="pill">Hytteeier</span>}
+            {me.workerCabins.length > 0 && <span className="pill">Prosjektmedarbeider</span>}
             {me.roles.map((r) => <span key={r} className="pill">{ROLE_LABEL[r]}</span>)}
           </div>
           <div className="sideactions">

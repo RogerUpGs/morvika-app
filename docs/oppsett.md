@@ -93,6 +93,7 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260928080000_gjoremal.sql` | Gjøremål med påminnelse, gjentakelse, utsett og deling med medeiere (planlagt jobb hvert minutt) | 29. sep 2026 |
 | `20260928090000_fdv.sql` | FDV-mal i Min hytte og eierskifte «Overlevering fra utbygger» | 29. sep 2026 |
 | `20260929000000_dokumenter_rediger.sql` | Info: styret kan endre tittel/kategori og slette dokumenter for sin forening | 29. sep 2026 |
+| `20260930000000_prosjektmedarbeider.sql` | Prosjektmedarbeidere: håndverkere ser bare dokumenter og bilder i Min hytte for prosjektet, endrer bare egne opplastinger, mister tilgangen ved eierskifte | **Ikke kjørt ennå** |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 

@@ -25,6 +25,8 @@ interface Person {
   roles: AppRole[]; cabin_ids: string[]; last_seen_at: string | null; created_at: string;
   /** Hytter der personen får SMS-varsler (én per hytte) */
   sms_cabin_ids?: string[];
+  /** Byggeprosjekter der personen er prosjektmedarbeider */
+  worker_cabin_ids?: string[];
 }
 interface OwnerDraft { key: string; id?: string; name: string; email: string; phone: string; status?: PersonStatus }
 
@@ -43,6 +45,7 @@ const toInt = (v: string) => (v.trim() === '' ? null : Number.parseInt(v, 10));
 const emailOk = (e: string) => e.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
 const isSms = (p: Person, cabinId: string) => (p.sms_cabin_ids ?? []).includes(cabinId);
+const isWorker = (p: Person, cabinId: string) => (p.worker_cabin_ids ?? []).includes(cabinId);
 
 function StatusPill({ s }: { s: PersonStatus }) {
   return <span className={`pill st-${s}`}>{STATUS_LABEL[s]}</span>;
@@ -142,6 +145,7 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
           <TransferPanel key={transfer.id} cabin={transfer} sellers={ownersOf(transfer.id)} onDone={reload} onClose={() => setTransfer(null)} />
         ) : showQuick ? (
           <CabinForm key={editing?.id ?? 'ny'} cabins={cabins} editing={editing} owners={editing ? ownersOf(editing.id) : []}
+            workers={editing ? people.filter((p) => isWorker(p, editing.id)) : []} reload={reload}
             note={editing ? notes[editing.id] ?? '' : ''}
             onSaved={async () => { await reload(); }}
             onClose={() => { setEditing(null); if (editing === null) setShowQuick(false); }} />
@@ -188,6 +192,11 @@ function CabinsTab({ cabins, people, notes, reload, onArchive }: { cabins: Admin
                           {ownersOf(c.id).map((o) => <div key={o.id}>{o.full_name} <StatusPill s={o.status} />{isSms(o, c.id) && <span className="pill smspill" title={o.phone ? `SMS-varsler går til ${o.phone}` : 'Får SMS, men mangler mobilnummer'}>SMS{o.phone ? '' : ' · mangler mobil'}</span>}</div>)}
                         </div>
                       )}
+                      {people.some((p) => isWorker(p, c.id)) && (
+                        <div className="muted workerline" title="Prosjektmedarbeidere ser bare dokumenter og bilder i Min hytte">
+                          Prosjekt: {people.filter((p) => isWorker(p, c.id)).map((p) => p.full_name).join(', ')}
+                        </div>
+                      )}
                     </td>
                     <td>{c.vel_member ? 'Ja' : '–'}</td>
                     <td>{c.va_member ? 'Ja' : '–'}</td>
@@ -220,8 +229,8 @@ const defaultGnr = (a: Area) => memo.get(`admin-gnr-${a}`) || (a === 'morvika' ?
 const defaultStreet = (a: Area) => memo.get(`admin-street-${a}`);
 const defaultTomt = (a: Area): Tomt | null => (a === 'torpum' ? null : (memo.get('admin-tomt') as Tomt) || 'feste');
 
-function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClose }: {
-  cabins: AdminCabin[]; editing: AdminCabin | null; owners: Person[]; note: string;
+function CabinForm({ cabins, editing, owners, workers, reload, note: initialNote, onSaved, onClose }: {
+  cabins: AdminCabin[]; editing: AdminCabin | null; owners: Person[]; workers: Person[]; reload: () => Promise<void>; note: string;
   onSaved: () => Promise<void>; onClose: () => void;
 }) {
   const toast = useToast();
@@ -442,6 +451,8 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
         )}
       </fieldset>
 
+      {editing && editing.access === 'full' && area === 'morvika' && <WorkersSection cabin={editing} workers={workers} reload={reload} />}
+
       <label className="field" htmlFor="q-note">Intern merknad (bare administrator ser den)
         <textarea id="q-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="F.eks. faktura sendes til annen adresse, dødsbo, kontaktperson …" style={{ minHeight: 60 }} />
       </label>
@@ -458,6 +469,74 @@ function CabinForm({ cabins, editing, owners, note: initialNote, onSaved, onClos
         )}
       </div>
     </form>
+  );
+}
+
+/* ---------- Prosjektmedarbeidere (håndverkere på byggeprosjekt) ---------- */
+function WorkersSection({ cabin, workers, reload }: { cabin: AdminCabin; workers: Person[]; reload: () => Promise<void> }) {
+  const toast = useToast();
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  async function add() {
+    if (!name.trim() || !email.trim()) { toast('Skriv inn navn og e-post.'); return; }
+    if (!emailOk(email)) { toast('E-postadressen ser ikke riktig ut.'); return; }
+    setBusy(true);
+    const { data, error } = await supabase.rpc('admin_add_worker', { p_cabin: cabin.id, p_name: name, p_email: email, p_phone: phone });
+    setBusy(false);
+    if (error) { toast(error.message.includes('function') ? 'Databasen må oppdateres først (prosjektmedarbeider).' : 'Medarbeideren ble ikke lagt til. Prøv igjen.'); return; }
+    toast(data === 'koblet'
+      ? `${name.trim()} har nå tilgang til ${cabin.label}.`
+      : `${name.trim()} er lagt til. Hen logger inn på app.morvika.no med ${email.trim().toLowerCase()}.`);
+    setName(''); setEmail(''); setPhone(''); setAdding(false);
+    await reload();
+  }
+  async function remove(p: Person) {
+    setConfirm(null);
+    const { error } = await supabase.rpc('admin_remove_worker', { p_cabin: cabin.id, p_person: p.id });
+    if (error) { toast('Medarbeideren ble ikke fjernet. Prøv igjen.'); return; }
+    toast(`${p.full_name} har ikke lenger tilgang til ${cabin.label}.`);
+    await reload();
+  }
+
+  return (
+    <fieldset className="workers">
+      <legend>Prosjektmedarbeidere</legend>
+      <p className="muted" style={{ margin: '0 0 10px', fontSize: 13 }}>
+        Håndverkere på byggeprosjektet. De ser bare dokumenter og bilder i Min hytte for denne hytta, kan laste opp,
+        og kan bare endre det de selv har lastet opp. Tilgangen forsvinner ved eierskifte, eller når du fjerner dem.
+      </p>
+      {workers.length > 0 && (
+        <div className="workerlist">
+          {workers.map((p) => (
+            <div key={p.id} className="workerrow">
+              <span><b>{p.full_name}</b> <span className="muted">{p.email}{p.phone ? ` · ${p.phone}` : ''}</span></span>
+              <StatusPill s={p.status} />
+              {confirm === p.id
+                ? <span className="confirm">Fjerne tilgangen?<button type="button" className="btn small danger-btn" onClick={() => void remove(p)}>Fjern</button><button type="button" className="btn small ghost" onClick={() => setConfirm(null)}>Avbryt</button></span>
+                : <button type="button" className="linkbtn" onClick={() => setConfirm(p.id)}>Fjern</button>}
+            </div>
+          ))}
+        </div>
+      )}
+      {adding ? (
+        <div className="ownerrow">
+          <label className="field" htmlFor="w-name">Fullt navn<input id="w-name" type="text" autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} placeholder="F.eks. Sven Snekker" /></label>
+          <label className="field" htmlFor="w-email">E-post (brukes til innlogging)<input id="w-email" type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={!emailOk(email)} /></label>
+          <label className="field" htmlFor="w-phone">Mobil<input id="w-phone" type="text" inputMode="tel" autoComplete="off" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
+          <div className="ownerrow-end">
+            <button type="button" className="btn small primary" disabled={busy} onClick={() => void add()}>{busy ? 'Legger til …' : 'Legg til'}</button>
+            <button type="button" className="btn small ghost" onClick={() => setAdding(false)}>Avbryt</button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="btn small" onClick={() => setAdding(true)}><Icon name="plus" size={16} />Legg til prosjektmedarbeider</button>
+      )}
+    </fieldset>
   );
 }
 
@@ -513,7 +592,8 @@ function PeopleTab({ cabins, people, reload }: { cabins: AdminCabin[]; people: P
                   <td><b>{p.full_name || <span className="muted">Uten navn</span>}</b></td>
                   <td>{p.email ?? <span className="muted">–</span>}</td>
                   <td className="num">{p.phone ?? <span className="muted">–</span>}</td>
-                  <td>{p.cabin_ids.map((id) => cabinLabel[id]).filter(Boolean).join(', ') || <span className="muted">–</span>}</td>
+                  <td>{p.cabin_ids.map((id) => cabinLabel[id]).filter(Boolean).join(', ') || (p.worker_cabin_ids?.length ? '' : <span className="muted">–</span>)}
+                    {(p.worker_cabin_ids ?? []).length > 0 && <div className="muted workerline">Prosjekt: {(p.worker_cabin_ids ?? []).map((id) => cabinLabel[id]).filter(Boolean).join(', ')}</div>}</td>
                   <td>
                     <div className="rolechips">
                       {ALL_ROLES.map((r) => (

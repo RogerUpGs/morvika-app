@@ -770,3 +770,100 @@ select pg_temp.check('overlevering fra utbygger: dokumenter, bilder og album fø
   and (select fdv from public.ownerships where cabin_id = '10000000-0000-0000-0000-000000000088' and ends_on is null)
   and (select full_transfer_at is not null and from_builder from public.ownership_transfers where id = :'tr'));
 select pg_temp.check('hytteregnskapet blir igjen hos utbyggeren', (select count(*) from public.cabin_ledger where ownership_id = :'w88') = 1);
+
+-- ---------------------------------------------------------------------
+-- Prosjektmedarbeidere (hytte 12 eies nå av Jonas)
+-- ---------------------------------------------------------------------
+reset role;
+select id as w47 from public.ownerships where cabin_id = '10000000-0000-0000-0000-000000000047' and ends_on is null \gset
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000103';
+select public.my_ownership('10000000-0000-0000-0000-000000000012') as w12 \gset
+insert into public.cabin_albums (cabin_id, name) values ('10000000-0000-0000-0000-000000000012', 'Råbygg');
+insert into public.cabin_documents (cabin_id, folder, name, storage_path) values ('10000000-0000-0000-0000-000000000012', 'Tegninger', 'Plantegning.pdf', :'w12' || '/plan.pdf');
+insert into storage.objects (bucket_id, name) values ('hytte', :'w12' || '/plan.pdf');
+insert into public.cabin_ledger (cabin_id, entry_date, description, category, amount, kind) values ('10000000-0000-0000-0000-000000000012', current_date, 'Tømmer', 'Annet', 5000, 'ut');
+select pg_temp.denied('bare administrator kan legge til prosjektmedarbeidere',
+  $$select public.admin_add_worker('10000000-0000-0000-0000-000000000012', 'X', 'x@example.no')$$);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.admin_add_worker('10000000-0000-0000-0000-000000000012', 'Sven Snekker', 'snekker@example.no', '900 00 000') as wr \gset
+select pg_temp.check('medarbeider uten konto venter på innlogging', :'wr' = 'venter');
+select pg_temp.fails('prosjektmedarbeider må ha e-post', $$select public.admin_add_worker('10000000-0000-0000-0000-000000000012', 'Uten Epost', '')$$);
+select pg_temp.fails('ikke prosjektmedarbeider på Torpum-hytte', $$select public.admin_add_worker('10000000-0000-0000-0000-000000000006', 'T', 't@example.no')$$);
+
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values ('00000000-0000-0000-0000-000000000701', 'snekker@example.no', '{}');
+select pg_temp.check('ved innlogging kobles prosjektet til kontoen',
+  exists (select 1 from public.cabin_workers where cabin_id = '10000000-0000-0000-0000-000000000012' and user_id = '00000000-0000-0000-0000-000000000701')
+  and not exists (select 1 from public.pending_people where email = 'snekker@example.no')
+  and (select full_name from public.profiles where id = '00000000-0000-0000-0000-000000000701') = 'Sven Snekker');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000701';
+select pg_temp.check('medarbeideren får prosjektet med eierperioden',
+  (select array_agg(ownership_id) from public.my_worker_cabins()) = array[:'w12']::uuid[]);
+select pg_temp.check('medarbeider er ikke beboer: ser ikke hytteregisteret, nyheter eller Hyttepraten',
+  not public.is_resident() and (select count(*) from public.cabins) = 0 and (select count(*) from public.news) = 0 and (select count(*) from public.posts) = 0
+  and (select count(*) from public.alerts) = 0 and (select count(*) from public.threads) = 0);
+select pg_temp.check('medarbeider ser dokumenter, album og filer, men ikke hytteregnskapet',
+  (select count(*) from public.cabin_documents where ownership_id = :'w12' and name = 'Plantegning.pdf') = 1
+  and exists (select 1 from public.cabin_albums where ownership_id = :'w12' and name = 'Råbygg')
+  and (select count(*) from storage.objects where name = :'w12' || '/plan.pdf') = 1
+  and (select count(*) from public.cabin_ledger) = 0);
+select pg_temp.check('medarbeider ser ikke andre hytter', (select count(*) from public.cabin_documents where ownership_id <> :'w12') = 0);
+insert into storage.objects (bucket_id, name) values ('hytte', :'w12' || '/tak.jpg'), ('hytte', :'w12' || '/sjakt.pdf');
+insert into public.cabin_photos (cabin_id, ownership_id, album_id, caption, storage_path)
+  select '10000000-0000-0000-0000-000000000012', :'w12', id, 'Takstoler på plass', :'w12' || '/tak.jpg' from public.cabin_albums where ownership_id = :'w12' and name = 'Råbygg';
+insert into public.cabin_documents (cabin_id, ownership_id, folder, name, storage_path) values ('10000000-0000-0000-0000-000000000012', :'w12', 'Produktdata', 'Sjakt.pdf', :'w12' || '/sjakt.pdf');
+select pg_temp.check('medarbeider laster opp bilder og dokumenter, merket med hvem',
+  (select uploaded_by from public.cabin_photos where storage_path = :'w12' || '/tak.jpg') = '00000000-0000-0000-0000-000000000701'
+  and (select uploaded_by from public.cabin_documents where storage_path = :'w12' || '/sjakt.pdf') = '00000000-0000-0000-0000-000000000701');
+select pg_temp.denied('medarbeider kan ikke føre i hytteregnskapet',
+  $$insert into public.cabin_ledger (cabin_id, ownership_id, entry_date, description, category, amount, kind) values ('10000000-0000-0000-0000-000000000012', '$$ || :'w12' || $$', current_date, 'x', 'Annet', 1, 'ut')$$);
+select pg_temp.denied('medarbeider kan ikke lage album', $$insert into public.cabin_albums (cabin_id, ownership_id, name) values ('10000000-0000-0000-0000-000000000012', '$$ || :'w12' || $$', 'Eget')$$);
+select pg_temp.denied('medarbeider kan ikke laste opp i andre hytter',
+  $$insert into storage.objects (bucket_id, name) values ('hytte', '$$ || :'w47' || $$/x.jpg')$$);
+select pg_temp.denied('medarbeider kan ikke lagre på andres navn',
+  $$insert into public.cabin_documents (cabin_id, ownership_id, name, storage_path, uploaded_by) values ('10000000-0000-0000-0000-000000000012', '$$ || :'w12' || $$', 'x', 'x', '00000000-0000-0000-0000-000000000103')$$);
+delete from public.cabin_documents where name = 'Plantegning.pdf';
+delete from storage.objects where name = :'w12' || '/plan.pdf';
+update public.cabin_documents set folder = 'Annet' where name = 'Plantegning.pdf';
+select pg_temp.check('medarbeider kan ikke slette eller endre eierens dokument eller fil',
+  (select folder from public.cabin_documents where name = 'Plantegning.pdf') = 'Tegninger'
+  and exists (select 1 from storage.objects where name = :'w12' || '/plan.pdf'));
+select pg_temp.check('medarbeider ser opplasterne med navn',
+  (select string_agg(full_name, ', ' order by full_name) from public.ownership_uploaders(:'w12')) = 'Jonas Aas, Sven Snekker');
+update public.cabin_documents set folder = 'Tegninger' where name = 'Sjakt.pdf';
+delete from public.cabin_documents where name = 'Sjakt.pdf';
+delete from storage.objects where name = :'w12' || '/sjakt.pdf';
+select pg_temp.check('medarbeider kan flytte og slette sitt eget dokument og fil',
+  not exists (select 1 from public.cabin_documents where name = 'Sjakt.pdf') and not exists (select 1 from storage.objects where name = :'w12' || '/sjakt.pdf'));
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000103';
+select pg_temp.check('eieren ser bildet fra medarbeideren, merket med hvem',
+  (select uploaded_by from public.cabin_photos where caption = 'Takstoler på plass') = '00000000-0000-0000-0000-000000000701');
+select pg_temp.check('eieren ser ikke prosjektmedarbeiderlisten', (select count(*) from public.cabin_workers) = 0);
+
+-- Administrator: personlisten, fjerning og rydding
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+select public.admin_add_worker('10000000-0000-0000-0000-000000000047', 'Mia Maler', 'maler@example.no') as wr2 \gset
+select pg_temp.check('personlisten viser prosjektene',
+  (select worker_cabin_ids from public.admin_people() where email = 'snekker@example.no') = array['10000000-0000-0000-0000-000000000012']::uuid[]
+  and (select worker_cabin_ids from public.admin_people() where email = 'maler@example.no') = array['10000000-0000-0000-0000-000000000047']::uuid[]);
+select public.admin_remove_owner('10000000-0000-0000-0000-000000000047', '00000000-0000-0000-0000-000000000999');
+select pg_temp.check('ventende medarbeider blir ikke ryddet bort', exists (select 1 from public.pending_people where email = 'maler@example.no'));
+select public.admin_remove_worker('10000000-0000-0000-0000-000000000047', (select id from public.pending_people where email = 'maler@example.no'));
+select pg_temp.check('fjernet ventende medarbeider uten annet blir ryddet bort', not exists (select 1 from public.pending_people where email = 'maler@example.no'));
+
+-- Eierskifte: tilgangen forsvinner
+select public.admin_transfer('10000000-0000-0000-0000-000000000012', current_date, 'salg',
+  '[{"name":"Nora Ny","email":"nora@example.no"}]'::jsonb, 'Overlevert', true) as tr12 \gset
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000701';
+select pg_temp.check('etter overlevering har medarbeideren ingen tilgang',
+  not exists (select 1 from public.my_worker_cabins()) and (select count(*) from public.cabin_documents) = 0
+  and (select count(*) from public.cabin_photos) = 0 and (select count(*) from storage.objects where bucket_id = 'hytte') = 0);
+reset role;
+select pg_temp.check('bildene fra medarbeideren følger med til kjøper',
+  (select count(*) from public.cabin_photos p join public.ownerships w on w.id = p.ownership_id
+    where w.cabin_id = '10000000-0000-0000-0000-000000000012' and w.ends_on is null and p.uploaded_by = '00000000-0000-0000-0000-000000000701') = 1);

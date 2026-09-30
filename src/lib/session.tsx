@@ -9,6 +9,11 @@ export interface FormerCabin {
   transfer_id: string | null; kind: 'salg' | 'familie' | null; full_transfer_at: string | null;
 }
 
+/** Byggeprosjekt der man er prosjektmedarbeider (håndverker): bare dokumenter og bilder */
+export interface WorkerCabin {
+  cabin_id: string; label: string; number: number; gnr: number | null; bnr: number | null; ownership_id: string; fdv: boolean;
+}
+
 interface Me {
   session: Session | null;
   profile: Profile | null;
@@ -22,6 +27,8 @@ interface Me {
   fullCabins: Cabin[];
   /** Tidligere hytter med lesetilgang (etter eierskifte) */
   former: FormerCabin[];
+  /** Prosjekter der man er prosjektmedarbeider */
+  workerCabins: WorkerCabin[];
   loading: boolean;
   error: string | null;
   reload: () => Promise<void>;
@@ -36,21 +43,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [cabins, setCabins] = useState<Cabin[]>([]);
   const [former, setFormer] = useState<FormerCabin[]>([]);
+  const [workerCabins, setWorkerCabins] = useState<WorkerCabin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadMe = useCallback(async (s: Session | null) => {
     if (!s) {
-      setProfile(null); setRoles([]); setCabins([]); setFormer([]); setLoading(false);
+      setProfile(null); setRoles([]); setCabins([]); setFormer([]); setWorkerCabins([]); setLoading(false);
       return;
     }
     setError(null);
     const uid = s.user.id;
-    const [p, r, c, f] = await Promise.all([
+    const [p, r, c, f, k] = await Promise.all([
       supabase.rpc('my_profile').maybeSingle<Profile>(),
       supabase.from('user_roles').select('role').eq('user_id', uid),
       supabase.from('cabin_owners').select('cabin:cabins(id,area,number,label,gnr,bnr,vel_member,va_member,vei_member,access)').eq('user_id', uid),
       supabase.rpc('my_former_cabins'),
+      supabase.rpc('my_worker_cabins'),
     ]);
     const firstError = p.error ?? r.error ?? c.error;
     if (firstError) setError(firstError.message);
@@ -62,6 +71,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       .sort((a, b) => a.number - b.number);
     setCabins(owned);
     setFormer(((f.data ?? []) as FormerCabin[]));
+    // Hytter man eier selv, vises som vanlig Min hytte
+    setWorkerCabins(((k.data ?? []) as WorkerCabin[]).filter((w) => !owned.some((o) => o.id === w.cabin_id && o.access === 'full')));
     setLoading(false);
     // Siste innlogging, til bruk i brukerregisteret
     void supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', uid);
@@ -83,7 +94,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [loadMe]);
 
   const value: Me = {
-    session, profile, roles, cabins, former, loading, error,
+    session, profile, roles, cabins, former, workerCabins, loading, error,
     isResident: roles.length > 0 || cabins.length > 0,
     veilagOnly: roles.length === 0 && cabins.length > 0 && cabins.every((c) => c.access === 'veilag'),
     fullCabins: cabins.filter((c) => c.access === 'full'),
