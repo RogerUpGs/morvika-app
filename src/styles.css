@@ -776,3 +776,11 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area
 .delcabin{margin:4px 0 12px}
 .delcabin.card{padding:14px 16px;border-color:color-mix(in srgb,var(--danger, #e5484d) 45%,var(--line))}
 .delcabin .actions{margin-top:10px}
+.wcards{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+.wcard{padding:16px 18px;display:grid;gap:10px}
+.wcard-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.wcard-h .muted{font-size:13px;margin-top:2px;word-break:break-all}
+.wcard-l{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.rolebtn.big{font-size:13.5px;padding:6px 12px}
+.wcard-f{display:flex;justify-content:flex-end}
+@media (max-width:420px){.wcards{grid-template-columns:1fr}}
