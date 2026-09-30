@@ -97,6 +97,7 @@ Når det kommer en ny fil i `supabase/migrations/`, kjøres den på samme måte 
 | `20260930010000_slett_hytte.sql` | Administrator kan slette en hytte (Rediger → «Slett hytta …») når eiere og prosjektmedarbeidere er fjernet | 30. sep 2026 |
 | `20260930020000_prosjektnavn.sql` | Prosjektnavn på hytter under bygging (vises for eier og prosjektmedarbeidere, fjernes ved eierskifte) | **Ikke kjørt ennå** |
 | `20260930030000_prosjektsamtale.sql` | Kjøper under oppføring (type på prosjektmedarbeider) og prosjektsamtale med bilder, PDF, push og «avtalt endring» | **Ikke kjørt ennå** |
+| `20260930040000_prosjektsamtale_kanaler.sql` | Prosjektsamtalen deles i adskilte tråder: kunde (eier + kjøper) og én per håndverker (eier + håndverker). Eier kan videresende meldinger mellom trådene | **Ikke kjørt ennå** |
 
 ## Slipp inn registrerte hytteeiere (etter `20260927170000_registrering.sql`)
 

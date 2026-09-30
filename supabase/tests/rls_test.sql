@@ -935,51 +935,85 @@ set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
 select public.my_ownership('10000000-0000-0000-0000-000000000077') as w77 \gset
 insert into public.project_messages (ownership_id, body) values (:'w77', 'Velkommen til prosjektet!');
-set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000701';
-insert into storage.objects (bucket_id, name) values ('hytte', :'w77' || '/chat/tak.pdf');
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000801';
+insert into storage.objects (bucket_id, name) values ('hytte', :'w77' || '/chat/tak.jpg');
 insert into public.project_messages (ownership_id, body, attachments)
-  values (:'w77', 'Forslag: takvinduer i stua', jsonb_build_array(jsonb_build_object('path', :'w77' || '/chat/tak.pdf', 'name', 'Tak.pdf')));
-select pg_temp.check('medarbeider skriver i samtalen, og cabin_id fylles inn',
-  (select cabin_id from public.project_messages where body like 'Forslag%') = '10000000-0000-0000-0000-000000000077');
-select pg_temp.denied('kan ikke skrive i andres navn',
-  $$insert into public.project_messages (ownership_id, body, author_id) values ('$$ || :'w77' || $$', 'x', '00000000-0000-0000-0000-000000000101')$$);
+  values (:'w77', 'Kan vi få takvinduer i stua?', jsonb_build_array(jsonb_build_object('path', :'w77' || '/chat/tak.jpg', 'name', 'tak.jpg', 'type', 'image/jpeg')));
+select pg_temp.check('kjøperen skriver i kundetråden, og cabin_id fylles inn',
+  (select cabin_id from public.project_messages where body like 'Kan vi%') = '10000000-0000-0000-0000-000000000077');
+select pg_temp.denied('kjøperen kan ikke skrive til en håndverker',
+  $$insert into public.project_messages (ownership_id, body, channel, worker_id) values ('$$ || :'w77' || $$', 'x', 'handverker', '00000000-0000-0000-0000-000000000701')$$);
+select pg_temp.denied('kjøperen kan ikke videresende',
+  $$insert into public.project_messages (ownership_id, body, fwd_author) values ('$$ || :'w77' || $$', 'x', 'Noen')$$);
 
-set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000801';
-select pg_temp.check('kjøperen ser samtalen, vedlegget og hvem som er med',
-  (select count(*) from public.project_messages where ownership_id = :'w77') = 2
-  and (select count(*) from storage.objects where name = :'w77' || '/chat/tak.pdf') = 1
-  and (select string_agg(role, ',' order by role) from public.project_participants(:'w77')) = 'eier,kjoper,medarbeider');
-select pg_temp.check('kjøperen ser også dokumenter og bilder i Min hytte', public.is_cabin_worker(:'w77'));
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+insert into public.project_messages (ownership_id, body, channel, worker_id, attachments, fwd_author, fwd_at, fwd_from)
+  select ownership_id, body, 'handverker', '00000000-0000-0000-0000-000000000701', attachments, 'Berit Kjøper', created_at, 'kunde'
+    from public.project_messages where body like 'Kan vi%';
+insert into public.project_messages (ownership_id, body, channel, worker_id) values (:'w77', 'Sven, kan du prise dette?', 'handverker', '00000000-0000-0000-0000-000000000701');
+select pg_temp.denied('eieren kan ikke åpne tråd med en som ikke er håndverker på prosjektet',
+  $$insert into public.project_messages (ownership_id, body, channel, worker_id) values ('$$ || :'w77' || $$', 'x', 'handverker', '00000000-0000-0000-0000-000000000801')$$);
+select pg_temp.check('eieren ser alle trådene', (select count(*) from public.project_messages where ownership_id = :'w77') = 4);
 
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000701';
-select public.project_mark_change((select id from public.project_messages where body like 'Forslag%'), true);
-select pg_temp.denied('bare kjøperen kan bekrefte en avtalt endring',
-  $$select public.project_confirm_change((select id from public.project_messages where body like 'Forslag%'))$$);
-delete from public.project_messages where body like 'Forslag%';
-select pg_temp.check('avtalt endring kan ikke slettes', exists (select 1 from public.project_messages where body like 'Forslag%'));
+insert into public.project_messages (ownership_id, body, channel, worker_id) values (:'w77', 'Ja, 12 000 kr ekstra.', 'handverker', '00000000-0000-0000-0000-000000000701');
+select pg_temp.check('håndverkeren ser bare sin egen tråd, med videresendt melding og vedlegg',
+  (select count(*) from public.project_messages) = 3
+  and (select fwd_author from public.project_messages where fwd_author is not null) = 'Berit Kjøper'
+  and (select count(*) from storage.objects where name = :'w77' || '/chat/tak.jpg') = 1
+  and not exists (select 1 from public.project_messages where channel = 'kunde'));
+select pg_temp.check('håndverkeren ser eier og seg selv i deltakerlisten, ikke kjøperen',
+  (select string_agg(role, ',' order by role) from public.project_participants(:'w77')) = 'eier,medarbeider');
+select pg_temp.denied('håndverkeren kan ikke skrive til kunden',
+  $$insert into public.project_messages (ownership_id, body) values ('$$ || :'w77' || $$', 'Hei Berit!')$$);
+select pg_temp.fails('håndverkeren kan ikke merke avtalt endring',
+  $$select public.project_mark_change((select id from public.project_messages where body like 'Ja, 12%'), true)$$);
+
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000801';
-select public.project_confirm_change((select id from public.project_messages where body like 'Forslag%'));
+select pg_temp.check('kjøperen ser bare kundetråden og deltakerne der',
+  (select count(*) from public.project_messages) = 2
+  and (select string_agg(role, ',' order by role) from public.project_participants(:'w77')) = 'eier,kjoper');
+select pg_temp.fails('kjøperen kan ikke merke avtalt endring',
+  $$select public.project_mark_change((select id from public.project_messages where body like 'Velkommen%'), true)$$);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+select public.project_mark_change((select id from public.project_messages where body like 'Kan vi%' and channel = 'kunde'), true);
+select pg_temp.fails('avtalt endring bare i kundetråden',
+  $$select public.project_mark_change((select id from public.project_messages where body like 'Ja, 12%'), true)$$);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000801';
+delete from public.project_messages where body like 'Kan vi%';
+select pg_temp.check('avtalt endring kan ikke slettes', exists (select 1 from public.project_messages where body like 'Kan vi%'));
+select public.project_confirm_change((select id from public.project_messages where body like 'Kan vi%'));
 select pg_temp.check('kjøperen bekrefter endringen',
-  (select change_confirmed_by from public.project_messages where body like 'Forslag%') = '00000000-0000-0000-0000-000000000801');
+  (select change_confirmed_by from public.project_messages where body like 'Kan vi%') = '00000000-0000-0000-0000-000000000801');
 
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000999';
 select pg_temp.check('uvedkommende ser ingen prosjektsamtale', not exists (select 1 from public.project_messages));
 select pg_temp.denied('uvedkommende kan ikke skrive', $$insert into public.project_messages (ownership_id, body) values ('$$ || :'w77' || $$', 'hei')$$);
 
 reset role;
-select pg_temp.check('push går til eier og kjøper, ikke til den som skrev',
-  (select array_agg(t.user_id order by t.user_id) from public.project_messages m, lateral public.push_targets('project_messages', m.id) t where m.body like 'Forslag%')
-   = array['00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-000000000801']::uuid[]);
+select pg_temp.check('push fra kjøper går til eier, ikke til håndverker',
+  (select array_agg(t.user_id order by t.user_id) from public.project_messages m, lateral public.push_targets('project_messages', m.id) t where m.body like 'Kan vi%' and m.channel = 'kunde')
+   = array['00000000-0000-0000-0000-000000000101']::uuid[]);
+select pg_temp.check('push fra håndverker går bare til eier',
+  (select array_agg(t.user_id) from public.project_messages m, lateral public.push_targets('project_messages', m.id) t where m.body like 'Ja, 12%')
+   = array['00000000-0000-0000-0000-000000000101']::uuid[]);
+select pg_temp.check('push fra eier i håndverkertråden går bare til den håndverkeren',
+  (select array_agg(t.user_id) from public.project_messages m, lateral public.push_targets('project_messages', m.id) t where m.body like 'Sven, kan%')
+   = array['00000000-0000-0000-0000-000000000701']::uuid[]);
 
 set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 select public.admin_transfer('10000000-0000-0000-0000-000000000077', current_date, 'salg', '[{"name":"Berit Kjøper","email":"berit@example.no"}]'::jsonb, '', true);
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000801';
-select pg_temp.check('etter overlevering eier kjøperen hytta og har samtalen som historikk',
+select pg_temp.check('etter overlevering eier kjøperen hytta og har bare kundetråden som historikk',
   (select count(*) from public.project_messages where ownership_id = public.my_ownership('10000000-0000-0000-0000-000000000077')) = 2
+  and not exists (select 1 from public.project_messages where channel = 'handverker')
   and not public.project_chat_open(public.my_ownership('10000000-0000-0000-0000-000000000077')));
 select pg_temp.denied('samtalen er skrivebeskyttet etter overlevering',
   $$insert into public.project_messages (ownership_id, body) values (public.my_ownership('10000000-0000-0000-0000-000000000077'), 'hei')$$);
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000701';
 select pg_temp.check('medarbeideren ser ikke samtalen etter overlevering', (select count(*) from public.project_messages where cabin_id = '10000000-0000-0000-0000-000000000077') = 0);
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000101';
+select pg_temp.check('utbyggeren beholder håndverkertråden i fristen', (select count(*) from public.project_messages where channel = 'handverker') = 3);
 reset role;
