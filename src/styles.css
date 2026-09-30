@@ -784,3 +784,7 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area
 .rolebtn.big{font-size:13.5px;padding:6px 12px}
 .wcard-f{display:flex;justify-content:flex-end}
 @media (max-width:420px){.wcards{grid-template-columns:1fr}}
+.projmail{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.projmail>span{display:grid;gap:3px}
+.projmail small{font-size:12.5px}
+.projmail-f{width:100%;display:grid;gap:8px}

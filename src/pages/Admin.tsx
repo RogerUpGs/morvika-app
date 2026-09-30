@@ -523,8 +523,9 @@ function DeleteCabin({ cabin, onDeleted }: { cabin: AdminCabin; onDeleted: () =>
 }
 
 /* ---------- Prosjektmedarbeidere: én person, flere prosjekter ---------- */
-/** Byggeprosjektene er hyttene som eies av denne kontoen */
-const PROJECT_OWNER = 'roger@morvika.no';
+/** Byggeprosjektene er hyttene som eies av prosjekt-e-posten (Administrasjon → Prosjektmedarbeidere) */
+const PROJECT_OWNER_DEFAULT = 'roger@morvika.no';
+const splitEmails = (v: string) => v.split(/[,;\s]+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
 
 function WorkersTab({ cabins, people, reload }: { cabins: AdminCabin[]; people: Person[]; reload: () => Promise<void> }) {
   const toast = useToast();
@@ -532,11 +533,28 @@ function WorkersTab({ cabins, people, reload }: { cabins: AdminCabin[]; people: 
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [projectEmail, setProjectEmail] = useState<string | null>(null);
+  const [editEmail, setEditEmail] = useState<string | null>(null);
 
-  const owner = people.find((p) => (p.email ?? '').toLowerCase() === PROJECT_OWNER);
+  useEffect(() => {
+    void supabase.from('app_settings').select('value').eq('key', 'project_owner_email').maybeSingle()
+      .then(({ data }) => setProjectEmail((data as { value?: string } | null)?.value || PROJECT_OWNER_DEFAULT));
+  }, []);
+  async function saveEmail() {
+    const list = splitEmails(editEmail ?? '');
+    if (!list.length || list.some((e) => !emailOk(e))) { toast('Skriv inn en gyldig e-postadresse.'); return; }
+    const { error } = await supabase.from('app_settings').upsert({ key: 'project_owner_email', value: list.join(', '), updated_at: new Date().toISOString() });
+    if (error) { toast('Prosjekt-e-posten ble ikke lagret.'); return; }
+    setProjectEmail(list.join(', ')); setEditEmail(null);
+    toast('Prosjekt-e-posten er lagret.');
+  }
+
+  const ownerEmails = splitEmails(projectEmail ?? '');
+  const owners = people.filter((p) => ownerEmails.includes((p.email ?? '').toLowerCase()));
+  const missing = ownerEmails.filter((e) => !owners.some((o) => (o.email ?? '').toLowerCase() === e));
   const workers = people.filter((p) => (p.worker_cabin_ids ?? []).length > 0).sort((a, b) => a.full_name.localeCompare(b.full_name, 'nb'));
-  // Rogers prosjekter, og hytter som allerede har medarbeidere
-  const projectIds = new Set([...(owner?.cabin_ids ?? []), ...workers.flatMap((w) => w.worker_cabin_ids ?? [])]);
+  // Hyttene til prosjekt-e-posten, og hytter som allerede har medarbeidere
+  const projectIds = new Set([...owners.flatMap((o) => o.cabin_ids), ...workers.flatMap((w) => w.worker_cabin_ids ?? [])]);
   const projects = cabins.filter((c) => projectIds.has(c.id) && c.access === 'full').sort((a, b) => a.label.localeCompare(b.label, 'nb', { numeric: true }));
   const shown = workers.filter((w) => !q.trim() || `${w.full_name} ${w.email ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()));
 
@@ -567,8 +585,26 @@ function WorkersTab({ cabins, people, reload }: { cabins: AdminCabin[]; people: 
           kan laste opp, og kan bare endre det de selv har lastet opp. Tilgangen forsvinner også ved eierskifte.</p>
         <button className="btn primary" onClick={() => setAdding((v) => !v)}><Icon name="plus" size={18} />Ny prosjektmedarbeider</button>
       </div>
-      {!projects.length && (
-        <div className="empty">Ingen prosjekter ennå. Prosjektene er hyttene som er registrert med {PROJECT_OWNER} som eier.</div>
+      <div className="card projmail">
+        {editEmail === null ? (
+          <>
+            <span><b>Prosjekt-e-post:</b> {projectEmail ?? '…'}
+              <small className="muted">Hyttene som er registrert med denne e-posten som eier, er byggeprosjektene i listen under.</small>
+              {projectEmail && missing.length > 0 && <small className="err">{missing.join(', ')} er ikke registrert som eier av noen hytte ennå.</small>}
+            </span>
+            <button className="btn small ghost" disabled={projectEmail === null} onClick={() => setEditEmail(projectEmail ?? '')}>Endre</button>
+          </>
+        ) : (
+          <form className="projmail-f" onSubmit={(e) => { e.preventDefault(); void saveEmail(); }}>
+            <label className="field" htmlFor="pm-email">Prosjekt-e-post (flere skilles med komma)
+              <input id="pm-email" type="text" inputMode="email" autoFocus value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+            </label>
+            <div className="actions"><button type="button" className="btn small ghost" onClick={() => setEditEmail(null)}>Avbryt</button><button className="btn small primary">Lagre</button></div>
+          </form>
+        )}
+      </div>
+      {projectEmail !== null && !projects.length && (
+        <div className="empty">Ingen prosjekter ennå. Registrer {ownerEmails.join(' eller ')} som eier av prosjekthyttene under «Hytter og eiere».</div>
       )}
       {adding && projects.length > 0 && <NewWorkerForm projects={projects} onDone={async () => { setAdding(false); await reload(); }} onCancel={() => setAdding(false)} />}
       {workers.length > 3 && (
